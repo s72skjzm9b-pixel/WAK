@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { requireActiveChild } from "@/lib/auth";
 import { availability, coverUrls, EVENT_FIELDS, myRegistrations } from "@/lib/events";
 import { PageTitle, EmptyState } from "@/components/ui/PageTitle";
-import { DateSticker } from "@/components/ui/DateSticker";
-import { StatusPill } from "@/components/ui/StatusPill";
-import { Blob } from "@/components/ui/Blob";
-import { IconPin, IconClock } from "@/components/ui/Icons";
-import { fmtDate, fmtMonth, fmtTime } from "@/lib/format";
+import { fmtMonth } from "@/lib/format";
 import { EventCard } from "./EventCard";
+import { NextWaktHero } from "./NextWaktHero";
 import type { WaktEvent } from "@/lib/types";
 
 export const metadata: Metadata = { title: "WAKT" };
@@ -45,31 +41,7 @@ export default async function WaktPage() {
       )}
 
       {next && (
-        <Link href={`/wakt/${next.id}`} className="relative mb-8 block overflow-hidden rounded-[2rem] border-[3px] border-cobalt bg-cobalt p-5 text-cream shadow-[4px_5px_0_0_var(--color-orange)]">
-          <Blob className="absolute -right-16 -top-16 size-56 opacity-90" fill="fill-lavender" lobes={8} />
-          {covers[next.cover_path ?? ""] && (
-            // eslint-disable-next-line @next/next/no-img-element -- private signed URL
-            <img src={covers[next.cover_path ?? ""]} alt="" className="relative mb-4 aspect-[16/9] w-full rounded-2xl border-[3px] border-cream object-cover" />
-          )}
-          <div className="relative flex items-start gap-4">
-            <DateSticker iso={next.starts_at} />
-            <div>
-              <p className="font-hand text-xl text-orange">Næste WAKT</p>
-              <h2 className="text-3xl leading-tight">{next.title}</h2>
-              <p className="mt-2 flex items-center gap-1.5"><IconClock className="size-5" /> {fmtDate(next.starts_at)} kl. {fmtTime(next.starts_at)}</p>
-              <p className="flex items-center gap-1.5"><IconPin className="size-5" /> {next.meeting_point}</p>
-              <div className="mt-3">
-                {mine[next.id] && ["pending_guardian", "confirmed", "waitlisted"].includes(mine[next.id].status) ? (
-                  <StatusPill status={mine[next.id].status} />
-                ) : (
-                  <span className="inline-flex rounded-full bg-orange px-4 py-2 font-display text-lg font-semibold text-cobalt-deep">
-                    Skal du med? →
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </Link>
+        <NextWaktHero ev={next} cover={covers[next.cover_path ?? ""]} myStatus={mine[next.id]?.status} />
       )}
 
       {[...months.entries()].map(([month, list]) => (
