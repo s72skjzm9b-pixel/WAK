@@ -1,26 +1,105 @@
 @import "tailwindcss";
+@import "@fontsource-variable/fredoka/index.css";
+@import "@fontsource/patrick-hand/400.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ===========================================================================
+   WAK design tokens
+   Colours from the brand board. Contrast notes (WCAG):
+   - cream on cobalt  10.7:1  ✓ body text
+   - cobalt on cream  10.7:1  ✓ body text
+   - cobalt on lavender 6.1:1 ✓ body text
+   - cobalt on orange  3.9:1  → only large/bold text (≥ 19px bold)
+   - never cream/white text on orange
+   =========================================================================== */
+@theme {
+  --color-cobalt: #1015b9;
+  --color-cobalt-deep: #0a0d7a;
+  --color-orange: #ff6500;
+  --color-cream: #fff7e9;
+  --color-lavender: #c8b4eb;
+  --color-lavender-soft: #ece4f9;
+  --color-paper: #fffdf8;
+  --color-ink: #0b0f6b;
+  --color-ink-soft: #3d418f;
+  --color-success: #0e7a4f;
+  --color-danger: #c4281c;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-display: "Fredoka Variable", "Fredoka", ui-rounded, system-ui, sans-serif;
+  --font-sans: "Fredoka Variable", "Fredoka", ui-rounded, system-ui, sans-serif;
+  --font-hand: "Patrick Hand", "Comic Sans MS", cursive;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --shadow-sticker: 3px 4px 0 0 var(--color-cobalt);
+  --shadow-sticker-sm: 2px 3px 0 0 var(--color-cobalt);
+  --shadow-sticker-orange: 3px 4px 0 0 var(--color-orange);
+
+  --radius-blob: 2rem 2.4rem 1.8rem 2.6rem;
+
+  --animate-pop: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+  --animate-wiggle: wiggle 0.6s ease-in-out;
+  --animate-float: float 4s ease-in-out infinite;
+
+  @keyframes pop {
+    0% { transform: scale(0.6); }
+    100% { transform: scale(1); }
+  }
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-6deg); }
+    75% { transform: rotate(6deg); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(-3deg); }
+    50% { transform: translateY(-6px) rotate(2deg); }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-orange);
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
+  ::selection {
+    background: var(--color-lavender);
+  }
+}
+
+@layer components {
+  /* Sticker surface: paper card with chunky cobalt edge and hard shadow */
+  .sticker {
+    background: var(--color-paper);
+    border: 2.5px solid var(--color-cobalt);
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow-sticker);
+  }
+  .paper-grain {
+    background-image: radial-gradient(rgba(16, 21, 185, 0.05) 1px, transparent 1px);
+    background-size: 14px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
