@@ -10,7 +10,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { DateSticker } from "@/components/ui/DateSticker";
 import { PageTitle, EmptyState } from "@/components/ui/PageTitle";
 import { BottomNav } from "@/components/ui/BottomNav";
-import { ArtCard } from "@/components/ArtCard";
+import { ArtPost } from "@/components/ArtPost";
 import { EventCard } from "@/app/(klub)/wakt/EventCard";
 import { NextWaktHero } from "@/app/(klub)/wakt/NextWaktHero";
 import { ReactionBar } from "@/app/(klub)/kunst/ReactionBar";
@@ -90,7 +90,7 @@ export default function StyleGuide() {
             <Field label="Kunstnernavn" htmlFor="sg-nick" hint="Det kan de andre se."><Input id="sg-nick" placeholder="fx Blå Banan" /></Field>
             <Field label="Brugernavn" htmlFor="sg-user" error="Det brugernavn er taget – prøv et andet"><Input id="sg-user" defaultValue="banan" /></Field>
             <Checkbox label="Der er ingen ansigter, navne eller adresser på billedet." defaultChecked />
-            <Notice tone="success" title="Din kunst er sendt til WAK!">Vi kigger lige på dit værk, før det kommer i galleriet.</Notice>
+            <Notice tone="success" title="Din kunst er i galleriet!">Nu kan de andre se den og give den emojis.</Notice>
             <Notice tone="error" title="Ups!">Billedet er for stort. Prøv et mindre billede.</Notice>
           </div>
           <div className="space-y-4">
@@ -117,10 +117,12 @@ export default function StyleGuide() {
             <div className="mx-auto w-full max-w-sm overflow-hidden rounded-[2.5rem] border-[6px] border-ink bg-cream">
               <div className="p-4">
                 <PageTitle kicker="nyeste fra klubben">KUNST</PageTitle>
-                <ul className="columns-2 gap-4">
-                  {SAMPLE_ART.map((a, i) => (
+                <ul className="space-y-6">
+                  {SAMPLE_ART.slice(0, 3).map((a, i) => (
                     <li key={i}>
-                      <ArtCard index={i} href="#" src={a.src} title={a.title} nickname={a.nickname} avatar={a.avatar} width={a.w} height={a.h} counts={a.counts} />
+                      <ArtPost href="#" src={a.src} title={a.title} nickname={a.nickname} avatar={a.avatar} width={a.w} height={a.h}>
+                        <ReactionBar artworkId={`00000000-0000-0000-0000-00000000000${i}`} initialCounts={a.counts} initialMine={null} compact />
+                      </ArtPost>
                     </li>
                   ))}
                 </ul>

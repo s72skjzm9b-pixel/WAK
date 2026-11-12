@@ -8,7 +8,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { fmtDateTime, fmtTime, nowMs } from "@/lib/format";
-import { CancelRegistration, ConsentToggle, DecideRegistration, DeletionRequest, ResetPassword } from "./Forms";
+import { CancelRegistration, ConsentToggle, DecideRegistration, DeletionRequest, RemoveArtwork, ResetPassword } from "./Forms";
 import type { Artwork, Profile, Registration, WaktEvent } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Forældreside" };
@@ -125,6 +125,7 @@ export default async function GuardianPage() {
 
               <div className="space-y-3">
                 <h3 className="text-2xl text-cobalt">{child.nickname}s kunst</h3>
+                <p className="text-sm text-ink-soft">Billeder vises i det lukkede galleri med det samme. Synes du, et billede ikke er okay, kan du fjerne det her.</p>
                 {childArt.length === 0 ? <p className="text-ink-soft">Ingen billeder endnu.</p> : (
                   <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                     {childArt.map((a) => (
@@ -134,6 +135,7 @@ export default async function GuardianPage() {
                           <img src={thumbs[a.thumb_path]} alt={a.title ?? ""} className="aspect-square w-full rounded-xl border-2 border-cobalt object-cover" />
                         ) : <div className="aspect-square rounded-xl bg-lavender-soft" />}
                         <StatusPill status={a.status} className="text-xs" />
+                        {a.status === "approved" && <RemoveArtwork artworkId={a.id} />}
                       </li>
                     ))}
                   </ul>

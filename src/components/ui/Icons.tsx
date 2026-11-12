@@ -9,11 +9,6 @@ export const IconKunst = ({ className }: P) => (
     <path d="M4 18l5-5 4 4 3-3 4 4" />
   </svg>
 );
-export const IconUpload = ({ className }: P) => (
-  <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...s}>
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-);
 export const IconWakt = ({ className }: P) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...s}>
     <rect x="3" y="5" width="18" height="16" rx="3.5" />

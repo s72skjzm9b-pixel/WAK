@@ -37,6 +37,17 @@ export async function cancelRegistration(_prev: ActionResult | null, formData: F
   return { ok: true, message: "Tilmeldingen er afmeldt." };
 }
 
+export async function removeChildArtwork(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  const art = uuid.safeParse(formData.get("artworkId"));
+  if (!art.success) return { ok: false, error: "Ugyldig" };
+  const { supabase } = await requireGuardian();
+  const { error } = await supabase.rpc("guardian_remove_artwork", { p_artwork: art.data });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath("/voksen");
+  revalidatePath("/kunst");
+  return { ok: true, message: "Billedet er fjernet." };
+}
+
 export async function setConsent(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const child = uuid.safeParse(formData.get("childId"));
   const type = z.enum(["membership", "image_sharing"]).safeParse(formData.get("type"));

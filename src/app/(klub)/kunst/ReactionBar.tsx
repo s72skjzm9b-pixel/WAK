@@ -36,7 +36,7 @@ export function ReactionBar({ artworkId, initialCounts, initialMine, readOnly = 
 
   return (
     <div>
-      <div role="group" aria-label="Reager med en emoji" className={`flex flex-wrap ${compact ? "gap-1" : "gap-2"}`}>
+      <div role="group" aria-label="Reager med en emoji" className={compact ? "grid grid-cols-7 gap-1" : "flex flex-wrap gap-2"}>
         {EMOJIS.map((e) => {
           const on = mine === e;
           const n = counts[e] ?? 0;
@@ -48,12 +48,18 @@ export function ReactionBar({ artworkId, initialCounts, initialMine, readOnly = 
               onClick={() => choose(e)}
               aria-pressed={on}
               aria-label={`${e} ${n}`}
-              className={`inline-flex items-center gap-1 rounded-full border-2 font-display font-semibold transition-transform active:scale-90 ${
-                compact ? "min-h-10 px-2.5 text-base" : "min-h-12 px-3.5 text-xl"
-              } ${on ? "border-cobalt bg-lavender shadow-sticker-sm motion-safe:animate-pop" : "border-cobalt/20 bg-paper"} ${readOnly ? "cursor-default" : ""}`}
+              className={`border-2 font-display font-semibold transition-transform active:scale-90 ${
+                compact
+                  ? "flex min-h-12 flex-col items-center justify-center rounded-2xl py-1 text-xl leading-none"
+                  : "inline-flex min-h-12 items-center gap-1 rounded-full px-3.5 text-xl"
+              } ${on ? "border-cobalt bg-lavender shadow-sticker-sm motion-safe:animate-pop" : n > 0 || !compact ? "border-cobalt/20 bg-paper" : "border-transparent bg-transparent opacity-60"} ${readOnly ? "cursor-default" : ""}`}
             >
               <span aria-hidden="true">{e}</span>
-              {n > 0 && <span className="text-base text-cobalt">{n}</span>}
+              {compact ? (
+                <span className="mt-0.5 h-4 text-sm leading-4 text-cobalt">{n > 0 ? n : ""}</span>
+              ) : (
+                n > 0 && <span className="text-base text-cobalt">{n}</span>
+              )}
             </button>
           );
         })}

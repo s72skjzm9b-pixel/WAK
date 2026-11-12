@@ -6,7 +6,7 @@ const LABELS: Record<string, { label: string; cls: string }> = {
   suspended: { label: "Suspenderet", cls: "bg-[#fde8e5] text-danger" },
   rejected: { label: "Afvist", cls: "bg-[#fde8e5] text-danger" },
   // artwork
-  pending: { label: "Vi kigger på den", cls: "bg-lavender text-cobalt" },
+  pending: { label: "Venter", cls: "bg-lavender text-cobalt" },
   approved: { label: "I galleriet", cls: "bg-[#d4f2e0] text-success" },
   removed: { label: "Fjernet", cls: "bg-[#fde8e5] text-danger" },
   // registrations

@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconKunst, IconMe, IconUpload, IconWakt } from "./Icons";
+import { IconCamera, IconKunst, IconMe, IconWakt } from "./Icons";
 
 const ITEMS = [
   { href: "/kunst", label: "KUNST", Icon: IconKunst },
-  { href: "/upload", label: "UPLOAD", Icon: IconUpload },
+  { href: "/upload", label: "UPLOAD", Icon: IconCamera },
   { href: "/wakt", label: "WAKT", Icon: IconWakt },
   { href: "/min-wak", label: "MIN WAK", Icon: IconMe },
 ];
@@ -31,13 +31,13 @@ export function BottomNav() {
                 <span
                   className={`flex items-center justify-center rounded-full transition-transform ${
                     isUpload
-                      ? "size-11 -mt-5 border-[3px] border-cobalt-deep bg-orange text-cobalt-deep shadow-[0_3px_0_0_var(--color-cobalt-deep)] group-active:translate-y-0.5"
+                      ? `h-8 w-14 bg-orange text-cobalt-deep group-active:scale-95 ${active ? "ring-[3px] ring-cream" : ""}`
                       : active
                         ? "h-8 w-14 bg-lavender text-cobalt"
                         : "h-8 w-14"
                   }`}
                 >
-                  <Icon className={isUpload ? "size-7" : "size-6"} />
+                  <Icon className="size-6" />
                 </span>
                 <span className={`font-display text-[13px] font-semibold tracking-wide ${active ? "text-cream" : "text-cream/80"}`}>
                   {label}

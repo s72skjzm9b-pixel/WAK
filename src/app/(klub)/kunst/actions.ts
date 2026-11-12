@@ -51,5 +51,5 @@ export async function reportArtwork(_prev: ActionResult | null, formData: FormDa
   });
   if (error && !error.message.includes("duplicate")) return { ok: false, error: friendlyError(error) };
   revalidatePath("/kunst");
-  return { ok: true, message: "Tak! En voksen fra WAK kigger på det. Værket er skjult for dig." };
+  return { ok: true, message: "Tak! Værket er skjult, indtil en voksen fra WAK har kigget på det." };
 }

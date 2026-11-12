@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         <section>
           <h2>Kort fortalt (til børn)</h2>
           <ul>
-            <li>Andre medlemmer kan kun se dit kunstnernavn, din tegnede figur, din korte tekst og den kunst, WAK har godkendt.</li>
+            <li>Andre medlemmer kan kun se dit kunstnernavn, din tegnede figur, din korte tekst og den kunst, du deler. Hvis noget ikke er okay, kan WAK eller din voksen fjerne det.</li>
             <li>Ingen kan se din alder, dit rigtige navn, din skole eller din voksens kontaktinfo.</li>
             <li>Der er ingen reklamer, og vi sælger aldrig noget om dig.</li>
             <li>Du kan altid bede din voksen om at slette din konto.</li>
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
         <section>
           <h2>Hvem kan se hvad?</h2>
           <ul>
-            <li>Godkendte medlemmer: kunstnernavn, figur, kort tekst og godkendt kunst.</li>
+            <li>Godkendte medlemmer: kunstnernavn, figur, kort tekst og delt kunst. Kunst vises med det samme; WAK-administratorer og barnets egen forælder kan fjerne et værk, og en anmeldelse skjuler værket, indtil WAK har kigget på det.</li>
             <li>Forælder/værge: alt om eget barn.</li>
             <li>WAK-administratorer: det, der er nødvendigt for at godkende, moderere og arrangere ture.</li>
             <li>Deltagerlister til ture vises aldrig til andre børn.</li>

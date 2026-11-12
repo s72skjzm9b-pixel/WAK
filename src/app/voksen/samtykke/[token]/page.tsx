@@ -52,7 +52,7 @@ export default async function ConsentPage({ params }: { params: Promise<{ token:
         <p>WAK – Weird Art Klub er en lukket, reklamefri kunstklub for børn på 10–13 år.</p>
         <ul className="ml-5 list-disc space-y-1">
           <li>Kun godkendte medlemmer kan se indhold. Ingen kan søge medlemmer frem, og der er ingen beskeder eller kommentarer.</li>
-          <li>Andre medlemmer ser kun kunstnernavn, en tegnet figur og godkendt kunst – aldrig alder, rigtigt navn eller kontaktinfo.</li>
+          <li>Andre medlemmer ser kun kunstnernavn, en tegnet figur og delt kunst – aldrig alder, rigtigt navn eller kontaktinfo.</li>
           <li>Alle billeder bliver set af en voksen fra WAK, før de vises. Placeringsdata fjernes fra billederne.</li>
           <li>Ture (WAKT) kræver altid dit ja – hver gang.</li>
           <li>Du kan trække samtykke tilbage og bede om sletning på forældresiden.</li>

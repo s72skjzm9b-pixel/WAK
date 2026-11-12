@@ -5,12 +5,11 @@ import Link from "next/link";
 import { coverUrls, EVENT_FIELDS } from "@/lib/events";
 import { nowMs } from "@/lib/format";
 import { PageTitle, EmptyState } from "@/components/ui/PageTitle";
-import { Avatar } from "@/components/ui/Avatar";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { EventCard } from "../wakt/EventCard";
-import { ProfileEditor } from "./ProfileEditor";
+import { ProfileCard } from "./ProfileEditor";
 import { deleteMyArtwork } from "./actions";
 import type { Artwork, Registration, WaktEvent } from "@/lib/types";
 
@@ -38,15 +37,13 @@ export default async function MyWakPage() {
     <>
       <PageTitle kicker="det er dig!">MIN WAK</PageTitle>
 
-      <section className="sticker relative mb-8 flex flex-col items-center gap-3 overflow-hidden bg-lavender p-6 text-center">
-        <Avatar value={profile.avatar} size="xl" className="bg-cream" />
-        <h2 className="text-4xl text-cobalt">{profile.nickname}</h2>
-        {profile.bio && <p className="max-w-sm text-lg">{profile.bio}</p>}
-        {(profile.pending_nickname || profile.pending_bio) && (
-          <p className="rounded-full bg-cream px-3 py-1 text-sm">WAK kigger på dine ændringer</p>
-        )}
-        <ProfileEditor avatar={profile.avatar} nickname={profile.pending_nickname ?? profile.nickname ?? ""} bio={profile.pending_bio ?? profile.bio ?? ""} />
-      </section>
+      <ProfileCard
+        avatar={profile.avatar}
+        nickname={profile.nickname ?? ""}
+        bio={profile.bio}
+        pendingNickname={profile.pending_nickname}
+        pendingBio={profile.pending_bio}
+      />
 
       <section className="mb-8">
         <h2 className="mb-3 text-3xl text-cobalt">Mine værker</h2>
@@ -66,7 +63,7 @@ export default async function MyWakPage() {
                 )}
                 <p className="truncate px-1 font-display font-semibold text-cobalt">{a.title ?? "Uden titel"}</p>
                 <StatusPill status={a.status} className="self-start" />
-                {a.status === "rejected" && a.moderation_note && <p className="px-1 text-sm text-ink-soft">{a.moderation_note}</p>}
+                {(a.status === "rejected" || a.status === "removed") && a.moderation_note && <p className="px-1 text-sm text-ink-soft">{a.moderation_note}</p>}
                 <form action={deleteMyArtwork} className="px-1">
                   <input type="hidden" name="artworkId" value={a.id} />
                   <button type="submit" className="min-h-10 text-sm font-semibold text-danger underline">Slet</button>

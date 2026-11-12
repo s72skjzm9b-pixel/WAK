@@ -14,9 +14,9 @@ A private, mobile-first creative club for children aged 10–13.
 
 | Who | Where | What they can do |
 | --- | --- | --- |
-| Child (10–13) | `/kunst` `/upload` `/wakt` `/min-wak` | Browse the private gallery, react with emojis, upload art (moderated), ask to join trips, edit their nickname/avatar |
-| Parent / guardian | `/voksen` | Give or withdraw consent, approve or decline trips, see their child's account and art, reset the child's password, request deletion |
-| WAK admin | `/admin` | Approve memberships, moderate art and reports, create trips, manage registrations, process deletions, read the audit log |
+| Child (10–13) | `/kunst` `/upload` `/wakt` `/min-wak` | Browse the private gallery, react with emojis, post art straight to the gallery, swipe between works, ask to join trips, edit their nickname/avatar |
+| Parent / guardian | `/voksen` | Give or withdraw consent, approve or decline trips, see their child's account and art, remove any of their child's pictures, reset the child's password, request deletion |
+| WAK admin | `/admin` | Approve memberships, review new art and reports, remove art, create trips, manage registrations, process deletions, read the audit log |
 | Anyone | `/` `/bliv-medlem` `/log-ind` `/privatliv` | Landing page, membership request, login, privacy information |
 
 ### The membership flow
@@ -44,14 +44,17 @@ A private, mobile-first creative club for children aged 10–13.
   expire after 15 minutes, and only for people who are allowed to see that picture.
 - **Photos are cleaned on upload.** Every image is re-encoded on the server, which removes GPS location,
   camera details and other hidden metadata (verified).
-- **Every upload is moderated** before other children can see it. Two reports from members hide a work
-  until an admin has looked at it.
-- **Other children only ever see** a nickname, a drawn avatar (never a photo), a short bio and approved art.
+- **Art is shared straight away** (a product decision: no approval queue). Safety relies on removal
+  after the fact: WAK admins can remove any work, a parent can remove their own child's work, and a
+  **single report** from a member hides the work for everyone until an admin has looked at it.
+  Admins should look through "Nyeste i galleriet" in `/admin/kunst` regularly.
+- **Other children only ever see** a nickname, a drawn avatar (never a photo), a short bio and shared art.
   Ages, real names, schools and parents' contact details are stored in separate tables only the child's
   own parent and admins can read.
 - **Participant lists are never shown to children.** Reactions are anonymous counts.
 - **No ads, no trackers, no analytics, no likes/followers/leaderboards, no messages, no comments,
-  no endless scroll.** The gallery uses a "show older art" button instead.
+  no endless scroll.** The gallery shows one work at a time (like a photo feed) with its emoji
+  reactions, 12 at a time, then a "show older art" button.
 - **Search engines are blocked** (`noindex` headers + `robots.txt`).
 - **Nickname and bio changes are reviewed** by an admin before they appear.
 - **Important actions are logged** in an audit log (who approved what, when).
@@ -89,7 +92,7 @@ receive mail. Parents log in with a **one-time email link** (no password). Admin
 
 ### 1. Create a Supabase project
 1. Create a project at [supabase.com](https://supabase.com) – choose an **EU region** (e.g. Frankfurt).
-2. Run the four SQL files in `supabase/migrations/` **in order** (SQL Editor → paste → Run),
+2. Run the SQL files in `supabase/migrations/` **in order** (SQL Editor → paste → Run),
    or with the Supabase CLI: `supabase link` then `supabase db push`.
 3. **Authentication → Sign In / Providers → Email**:
    - Turn **off** "Allow new users to sign up" (accounts are only created by the app's server).
@@ -132,7 +135,7 @@ In development, emails are printed in the terminal instead of being sent (or wri
 
 | Check | Command | Status |
 | --- | --- | --- |
-| Database security (36 tests: anonymous / pending / suspended / rejected access, privacy between members, moderation, reactions, reports, consent withdrawal, **no overbooking under concurrent approvals**, waitlist, expiry, deletion cascade, audit log) | `npm run test:db` (needs PostgreSQL 15+ installed locally) | ✅ passing |
+| Database security (38 tests: anonymous / pending / suspended / rejected access, privacy between members, instant sharing, parent/admin removal, swipe neighbours, reactions, reports, consent withdrawal, **no overbooking under concurrent approvals**, waitlist, expiry, deletion cascade, audit log) | `npm run test:db` (needs PostgreSQL 15+ installed locally) | ✅ passing |
 | Type check / lint / production build | `npm run typecheck` · `npm run lint` · `npm run build` | ✅ passing |
 | Image metadata removal (EXIF/GPS) | manual check against `src/lib/images.ts` | ✅ verified |
 | Full flows in a browser against a real Supabase project | – | ❌ **not yet done** (see below) |

@@ -23,58 +23,33 @@ type Art = { id: string; title: string | null; description: string | null; image
 export default async function ArtModerationPage() {
   const { supabase } = await requireAdmin();
   const select = "id, title, description, image_path, thumb_path, status, created_at, owner_id, profiles!artworks_owner_id_fkey(nickname)";
-  const [{ data: pending }, { data: reports }, { data: recent }] = await Promise.all([
-    supabase.from("artworks").select(select).eq("status", "pending").order("created_at"),
+  const [{ data: reports }, { data: recent }] = await Promise.all([
     supabase.from("content_reports").select("id, reason, details, created_at, artwork_id, artworks(id, title, image_path, thumb_path, status, owner_id)").eq("status", "open").order("created_at"),
-    supabase.from("artworks").select(select).eq("status", "approved").order("approved_at", { ascending: false }).limit(24),
+    supabase.from("artworks").select(select).eq("status", "approved").order("approved_at", { ascending: false }).limit(48),
   ]);
-  const pend = (pending ?? []) as unknown as Art[];
   const rec = (recent ?? []) as unknown as Art[];
   const reps = (reports ?? []) as unknown as { id: string; reason: string; details: string | null; created_at: string; artwork_id: string; artworks: Art | null }[];
   const urls = await signPaths(supabase, "artwork", [
-    ...pend.map((a) => a.image_path),
-    ...reps.map((r) => r.artworks?.thumb_path ?? ""),
-    ...rec.map((a) => a.thumb_path),
+    ...reps.map((r) => r.artworks?.image_path ?? ""),
+    ...rec.map((a) => a.image_path),
   ]);
 
   return (
     <div className="space-y-10">
-      <section>
-        <h1 className="mb-2 text-4xl text-cobalt">Venter på godkendelse ({pend.length})</h1>
-        <p className="mb-4 text-ink-soft">
-          Afvis billeder med genkendelige ansigter, navne, adresser, skolelogoer, nummerplader eller andet, der kan identificere nogen – og alt ubehageligt.
-        </p>
-        {pend.length === 0 && <Notice>Alt er kigget igennem. 🎉</Notice>}
-        <ul className="grid gap-5 md:grid-cols-2">
-          {pend.map((a) => (
-            <li key={a.id} className="sticker space-y-3 p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element -- private signed URL */}
-              {urls[a.image_path] && <img src={urls[a.image_path]} alt="" className="max-h-96 w-full rounded-xl bg-lavender-soft object-contain" />}
-              <div>
-                <p className="font-display text-xl text-cobalt">{a.title ?? "Uden titel"}</p>
-                <p className="text-sm text-ink-soft">af {a.profiles?.nickname} · {fmtShortDate(a.created_at)}</p>
-                {a.description && <p className="mt-1">{a.description}</p>}
-              </div>
-              <ActionForm action={moderateArtwork} hidden={{ artworkId: a.id }}>
-                <input name="note" placeholder="Besked til barnet ved afvisning (venlig og kort)" className="rounded-xl border-2 border-cobalt/30 bg-paper px-3 py-2" />
-                <div className="flex gap-2">
-                  <SubmitButton name="status" value="approved">Godkend</SubmitButton>
-                  <SubmitButton name="status" value="rejected" variant="danger">Afvis</SubmitButton>
-                </div>
-              </ActionForm>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Notice title="Kunst vises med det samme">
+        Børnenes billeder kommer i galleriet, så snart de er delt. Kig de nyeste igennem jævnligt, og fjern billeder med genkendelige
+        ansigter, navne, adresser, skolelogoer, nummerplader eller andet, der kan identificere nogen – og alt ubehageligt.
+        Ét anmeldt billede skjules automatisk, indtil du har taget stilling.
+      </Notice>
 
       <section id="anmeldelser">
-        <h2 className="mb-4 text-3xl text-cobalt">Anmeldelser ({reps.length})</h2>
+        <h1 className="mb-4 text-4xl text-cobalt">Anmeldelser ({reps.length})</h1>
         {reps.length === 0 && <Notice>Ingen åbne anmeldelser.</Notice>}
         <ul className="space-y-3">
           {reps.map((r) => (
             <li key={r.id} className="sticker flex flex-wrap gap-4 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element -- private signed URL */}
-              {r.artworks && urls[r.artworks.thumb_path] && <img src={urls[r.artworks.thumb_path]} alt="" className="size-28 rounded-xl object-cover" />}
+              {r.artworks && urls[r.artworks.image_path] && <img src={urls[r.artworks.image_path]} alt="" className="max-h-72 w-full max-w-xs rounded-xl bg-lavender-soft object-contain" />}
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">{REASONS[r.reason]}</p>
                 {r.details && <p>“{r.details}”</p>}
@@ -90,13 +65,14 @@ export default async function ArtModerationPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-3xl text-cobalt">Senest godkendt</h2>
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <h2 className="mb-4 text-3xl text-cobalt">Nyeste i galleriet</h2>
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {rec.map((a) => (
             <li key={a.id} className="sticker space-y-2 p-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- private signed URL */}
-              {urls[a.thumb_path] && <img src={urls[a.thumb_path]} alt="" className="aspect-square w-full rounded-xl object-cover" />}
+              {urls[a.image_path] && <img src={urls[a.image_path]} alt="" loading="lazy" className="aspect-square w-full rounded-xl bg-lavender-soft object-contain" />}
               <p className="truncate text-sm">{a.title ?? "Uden titel"} · {a.profiles?.nickname}</p>
+              <p className="text-xs text-ink-soft">{fmtShortDate(a.created_at)}</p>
               <ActionForm action={moderateArtwork} hidden={{ artworkId: a.id, status: "removed", note: "Fjernet af WAK" }}>
                 <SubmitButton variant="danger" size="sm">Fjern</SubmitButton>
               </ActionForm>

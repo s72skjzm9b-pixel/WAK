@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Splash } from "@/components/Splash";
 
 export const metadata: Metadata = {
   title: { default: "WAK – Weird Art Klub", template: "%s · WAK" },
@@ -20,8 +21,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="da">
-      <body className="min-h-dvh">{children}</body>
+    <html lang="da" suppressHydrationWarning>
+      <body className="min-h-dvh">
+        <Splash />
+        {children}
+      </body>
     </html>
   );
 }

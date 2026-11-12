@@ -37,7 +37,7 @@ export function ConsentForm({ token, nickname }: { token: string; nickname: stri
       <Checkbox name="membership" required label={`Jeg er forælder/værge for ${nickname} og giver samtykke til, at ${nickname} bliver medlem af WAK.`} />
       <Checkbox
         name="imageSharing"
-        label={`Jeg giver samtykke til, at ${nickname} må dele billeder af kunst i WAK's lukkede galleri (efter WAK har godkendt hvert billede). Frivilligt – kan slås fra når som helst.`}
+        label={`Jeg giver samtykke til, at ${nickname} må dele billeder af kunst i WAK's lukkede galleri. Billederne vises med det samme, og både du og WAK kan fjerne dem. Frivilligt – kan slås fra når som helst.`}
       />
       <div className="mt-2 flex flex-col gap-3 sm:flex-row">
         <SubmitButton name="decision" value="approve" size="lg" pendingLabel="Gemmer…">Ja, giv samtykke</SubmitButton>

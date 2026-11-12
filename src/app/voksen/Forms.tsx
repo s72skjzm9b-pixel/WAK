@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useState, type ReactNode } from "react";
-import { cancelRegistration, decideRegistration, requestDeletion, resetChildPassword, setConsent } from "./actions";
+import { cancelRegistration, decideRegistration, removeChildArtwork, requestDeletion, resetChildPassword, setConsent } from "./actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
@@ -96,6 +96,19 @@ export function DeletionRequest({ kind, childId, label }: { kind: "child_account
         <SubmitButton variant="danger" size="sm">Send anmodning</SubmitButton>
         <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>Fortryd</Button>
       </div>
+    </form>
+  );
+}
+
+/** A parent can take down one of their child's pictures straight away. */
+export function RemoveArtwork({ artworkId }: { artworkId: string }) {
+  const [state, action] = useActionState(removeChildArtwork, null);
+  if (state?.ok) return <p className="text-xs font-semibold text-success">Fjernet</p>;
+  return (
+    <form action={action} onSubmit={(e) => { if (!confirm("Fjerne billedet fra galleriet?")) e.preventDefault(); }}>
+      <input type="hidden" name="artworkId" value={artworkId} />
+      {state && !state.ok && <p className="text-xs text-danger">{state.error}</p>}
+      <button type="submit" className="min-h-9 text-sm font-semibold text-danger underline">Fjern</button>
     </form>
   );
 }

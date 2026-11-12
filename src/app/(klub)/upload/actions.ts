@@ -64,5 +64,6 @@ export async function uploadArtwork(_prev: ActionResult | null, formData: FormDa
     return { ok: false, error: friendlyError(error) };
   }
   revalidatePath("/min-wak");
+  revalidatePath("/kunst");
   return { ok: true };
 }

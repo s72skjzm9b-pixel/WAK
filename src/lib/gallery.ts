@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FeedItem, ReactionSummary } from "@/lib/types";
 import { signPaths } from "@/lib/storage";
 
-export const PAGE_SIZE = 18;
+export const PAGE_SIZE = 12;
 
 export async function reactionMap(supabase: SupabaseClient, ids: string[]) {
   const counts: Record<string, Record<string, number>> = {};
@@ -24,7 +24,15 @@ export async function loadFeed(supabase: SupabaseClient, before?: string | null,
     p_artwork: artworkId ?? null,
   });
   const items = (error ? [] : (data ?? [])) as FeedItem[];
-  const urls = await signPaths(supabase, "artwork", items.flatMap((i) => (artworkId ? [i.image_path] : [i.thumb_path])));
+  // One big picture at a time in the feed, so sign the full image (max 1800px).
+  const urls = await signPaths(supabase, "artwork", items.map((i) => i.image_path));
   const reactions = await reactionMap(supabase, items.map((i) => i.id));
   return { items, urls, ...reactions };
+}
+
+/** Newer / older neighbour in gallery order, for swiping between works. */
+export async function loadNeighbors(supabase: SupabaseClient, artworkId: string) {
+  const { data } = await supabase.rpc("gallery_neighbors", { p_artwork: artworkId });
+  const row = (data as { newer: string | null; older: string | null }[] | null)?.[0];
+  return { newer: row?.newer ?? null, older: row?.older ?? null };
 }

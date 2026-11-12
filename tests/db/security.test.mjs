@@ -249,15 +249,11 @@ describe("member privacy", () => {
 });
 
 describe("artwork and moderation", () => {
-  test("new uploads stay hidden until an admin approves them", async () => {
+  test("new uploads are shared straight away with active members only", async () => {
     const art = await upload(alice.id);
-    const [mine] = await rows(alice.id, "select status from public.artworks where id=$1", [art.id]);
-    assert.equal(mine.status, "pending");
-    assert.equal((await rows(bob.id, "select * from public.artworks where id=$1", [art.id])).length, 0);
-    assert.equal((await rows(bob.id, "select * from public.gallery_feed(null, 48, $1)", [art.id])).length, 0);
-    assert.equal((await rows(bob.id, "select * from storage.objects where name=$1", [art.image])).length, 0);
-
-    await q(admin, "select public.admin_moderate_artwork($1,'approved',null)", [art.id]);
+    const [mine] = await rows(alice.id, "select status, approved_at from public.artworks where id=$1", [art.id]);
+    assert.equal(mine.status, "approved");
+    assert.ok(mine.approved_at);
     const feed = await rows(bob.id, "select * from public.gallery_feed(null, 48, $1)", [art.id]);
     assert.equal(feed.length, 1);
     assert.equal(feed[0].owner_nickname.startsWith("Kunstner"), true);
@@ -265,6 +261,34 @@ describe("artwork and moderation", () => {
     // still invisible to the suspended / pending
     assert.equal((await rows(suspended.id, "select * from storage.objects where name=$1", [art.image])).length, 0);
     assert.equal((await rows(pendingA.id, "select * from storage.objects where name=$1", [art.image])).length, 0);
+    assert.equal((await rows(pendingA.id, "select * from public.gallery_feed(null, 48, $1)", [art.id])).length, 0);
+  });
+
+  test("swiping neighbours follow gallery order and visibility", async () => {
+    const a1 = await upload(alice.id);
+    const a2 = await upload(alice.id);
+    const a3 = await upload(alice.id);
+    let [n] = await rows(bob.id, "select * from public.gallery_neighbors($1)", [a2.id]);
+    assert.equal(n.newer, a3.id);
+    assert.equal(n.older, a1.id);
+    await q(admin, "select public.admin_moderate_artwork($1,'removed','test')", [a3.id]);
+    [n] = await rows(bob.id, "select * from public.gallery_neighbors($1)", [a2.id]);
+    assert.notEqual(n.newer, a3.id);
+    assert.equal((await rows(suspended.id, "select * from public.gallery_neighbors($1)", [a2.id])).length, 0);
+  });
+
+  test("a parent can remove their own child's work, not others'", async () => {
+    const kid = await makeChild("active");
+    const art = await upload(kid.id);
+    const other = await upload(alice.id);
+    await rejects(q(kid.guardian, "select public.guardian_remove_artwork($1)", [other.id]), /forbidden/);
+    await rejects(q(bob.id, "select public.guardian_remove_artwork($1)", [art.id]), /forbidden/);
+    await q(kid.guardian, "select public.guardian_remove_artwork($1)", [art.id]);
+    assert.equal((await rows(bob.id, "select * from public.gallery_feed(null,48,$1)", [art.id])).length, 0);
+    const [a] = await rows(kid.id, "select status from public.artworks where id=$1", [art.id]);
+    assert.equal(a.status, "removed");
+    const [log] = await rows(admin, "select * from public.audit_log where action='artwork.removed_by_guardian' and target_id=$1", [art.id]);
+    assert.ok(log);
   });
 
   test("feed never leaks private fields", async () => {
@@ -338,19 +362,24 @@ describe("reactions and reports", () => {
     assert.equal(sum.length, 0);
   });
 
-  test("cannot react to unapproved art or as a suspended member", async () => {
+  test("cannot react to removed art or as a suspended member", async () => {
     const art = await upload(alice.id);
+    await rejects(q(suspended.id, "insert into public.reactions (artwork_id, user_id, emoji) values ($1,$2,'🔥')", [art.id, suspended.id]), /row-level security/);
+    await q(admin, "select public.admin_moderate_artwork($1,'removed',null)", [art.id]);
     await rejects(q(bob.id, "insert into public.reactions (artwork_id, user_id, emoji) values ($1,$2,'🔥')", [art.id, bob.id]), /row-level security/);
-    await q(admin, "select public.admin_moderate_artwork($1,'approved',null)", [art.id]);
     await rejects(q(suspended.id, "insert into public.reactions (artwork_id, user_id, emoji) values ($1,$2,'🔥')", [art.id, suspended.id]), /row-level security/);
   });
 
-  test("reported work hides for the reporter; two reports hide it for everyone", async () => {
+  test("one report hides a work for everyone until an admin decides", async () => {
     const art = await upload(alice.id);
     await q(admin, "select public.admin_moderate_artwork($1,'approved',null)", [art.id]);
     const carl = await makeChild("active");
+    assert.equal((await rows(carl.id, "select * from public.gallery_feed(null,48,$1)", [art.id])).length, 1);
     await q(bob.id, "insert into public.content_reports (artwork_id, reporter_id, reason) values ($1,$2,'personal_info')", [art.id, bob.id]);
     assert.equal((await rows(bob.id, "select * from public.gallery_feed(null,48,$1)", [art.id])).length, 0);
+    // one report hides it for everyone until an admin has looked
+    assert.equal((await rows(carl.id, "select * from public.gallery_feed(null,48,$1)", [art.id])).length, 0);
+    await q(admin, "select public.admin_resolve_report(id,'dismissed',false) from public.content_reports where artwork_id=$1", [art.id]);
     assert.equal((await rows(carl.id, "select * from public.gallery_feed(null,48,$1)", [art.id])).length, 1);
     await q(carl.id, "insert into public.content_reports (artwork_id, reporter_id, reason) values ($1,$2,'unsafe')", [art.id, carl.id]);
     const dave = await makeChild("active");
@@ -359,7 +388,8 @@ describe("reactions and reports", () => {
     assert.equal((await rows(carl.id, "select * from public.content_reports where artwork_id=$1", [art.id])).length, 1);
     const reports = await rows(admin, "select id from public.content_reports where artwork_id=$1", [art.id]);
     assert.equal(reports.length, 2);
-    await q(admin, "select public.admin_resolve_report($1,'resolved',true)", [reports[0].id]);
+    const [open] = await rows(admin, "select id from public.content_reports where artwork_id=$1 and status='open'", [art.id]);
+    await q(admin, "select public.admin_resolve_report($1,'resolved',true)", [open.id]);
     const [a] = await rows(admin, "select status from public.artworks where id=$1", [art.id]);
     assert.equal(a.status, "removed");
   });

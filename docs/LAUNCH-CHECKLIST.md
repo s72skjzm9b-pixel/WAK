@@ -26,7 +26,9 @@ Items here need a **human decision or review**. The code supports them, but it c
 - [ ] **Vetting of admins/organisers** (børneattest for anyone who meets children on WAKT).
 - [ ] What happens when moderation finds something worrying (escalation, contact to parents, authorities).
 - [ ] Trip policies: adult-to-child ratio, emergency contacts, photo rules on trips, pickup rules.
-- [ ] Response time targets for moderation queue and reports.
+- [ ] Art is shown **without prior approval** (decided Nov 2026). Agree who checks new art and reports, and
+      how often (e.g. daily), since an unsuitable picture is visible until someone removes it or reports it.
+- [ ] Response time targets for reports.
 
 ## 3. Operations / technical — needs configuration
 - [ ] Supabase project in an EU region; migrations applied; **public sign-ups disabled**.
@@ -47,8 +49,8 @@ Run on a staging Supabase project, on a phone:
 3. [ ] An admin approves the account.
 4. [ ] The child logs in.
 5. [ ] The child uploads artwork (try a photo with GPS – confirm it is gone in the stored file).
-6. [ ] An admin approves the artwork.
-7. [ ] Another approved member sees it.
+6. [ ] Another approved member sees it at once in the feed and can swipe between works.
+7. [ ] The parent and an admin can each remove it; a report hides it for everyone.
 8. [ ] Members react with emojis (add, change, remove; reload to confirm it persisted).
 9. [ ] A child finds a WAKT and presses "Jeg vil med!".
 10. [ ] The parent approves participation.

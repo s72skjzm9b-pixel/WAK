@@ -55,11 +55,11 @@ export function UploadForm() {
     return (
       <div className="sticker flex flex-col items-center gap-3 p-8 text-center">
         <Sticker name="sticker-peace" className="h-28 w-auto motion-safe:animate-wiggle" />
-        <h2 className="text-4xl text-cobalt">Din kunst er sendt til WAK!</h2>
-        <p className="text-lg">Vi kigger lige på dit værk, før det kommer i galleriet.</p>
+        <h2 className="text-4xl text-cobalt">Din kunst er i galleriet!</h2>
+        <p className="text-lg">Nu kan de andre i klubben se den og give den emojis.</p>
         <div className="mt-2 flex flex-wrap justify-center gap-3">
-          <a href="/upload" className={buttonClass("orange")}>Del mere</a>
-          <ButtonLink href="/min-wak" variant="ghost">Se mine værker</ButtonLink>
+          <ButtonLink href="/kunst" variant="orange">Se galleriet</ButtonLink>
+          <a href="/upload" className={buttonClass("ghost")}>Del mere</a>
         </div>
       </div>
     );
@@ -109,8 +109,8 @@ export function UploadForm() {
         label="Der er ingen ansigter, navne, adresser, skolelogoer eller andet, der kan afsløre hvem nogen er."
       />
 
-      <SubmitButton variant="orange" size="lg" disabled={!preview} pendingLabel="Sender til WAK…">
-        Send til WAK
+      <SubmitButton variant="orange" size="lg" disabled={!preview} pendingLabel="Deler…">
+        Del i galleriet
       </SubmitButton>
     </form>
   );
