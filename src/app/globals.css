@@ -107,6 +107,17 @@
 /* Opening splash (src/components/Splash.tsx) */
 .wak-splash {
   animation: wak-splash-out 0.35s ease-in 1.1s forwards;
+  pointer-events: none; /* never blocks a tap, even while visible */
+}
+/* Art images: no iOS long-press menu / link preview (which would open the
+   page in a preview window) and no "save image" for other children's art. */
+.art-protect {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.art-protect img {
+  -webkit-user-drag: none;
 }
 .wak-splash-badge {
   animation: wak-splash-pop 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) both;

@@ -50,7 +50,7 @@ export async function uploadArtwork(_prev: ActionResult | null, formData: FormDa
     return { ok: false, error: friendlyError(up2.error) };
   }
 
-  const { error } = await supabase.from("artworks").insert({
+  const { data: row, error } = await supabase.from("artworks").insert({
     owner_id: me,
     title: parsed.data.title || null,
     description: parsed.data.description || null,
@@ -58,12 +58,13 @@ export async function uploadArtwork(_prev: ActionResult | null, formData: FormDa
     thumb_path: thumbPath,
     width: processed.width,
     height: processed.height,
-  });
+  }).select("status").single();
   if (error) {
     await bucket.remove([imagePath, thumbPath]);
     return { ok: false, error: friendlyError(error) };
   }
   revalidatePath("/min-wak");
   revalidatePath("/kunst");
-  return { ok: true };
+  // "pending" only if the database still runs the old approve-first rules.
+  return { ok: true, message: row?.status === "approved" ? "shared" : "pending" };
 }

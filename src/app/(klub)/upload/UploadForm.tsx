@@ -55,8 +55,17 @@ export function UploadForm() {
     return (
       <div className="sticker flex flex-col items-center gap-3 p-8 text-center">
         <Sticker name="sticker-peace" className="h-28 w-auto motion-safe:animate-wiggle" />
-        <h2 className="text-4xl text-cobalt">Din kunst er i galleriet!</h2>
-        <p className="text-lg">Nu kan de andre i klubben se den og give den emojis.</p>
+        {state.message === "pending" ? (
+          <>
+            <h2 className="text-4xl text-cobalt">Din kunst er sendt til WAK!</h2>
+            <p className="text-lg">En voksen fra WAK kigger lige på den, før den kommer i galleriet.</p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-4xl text-cobalt">Din kunst er i galleriet!</h2>
+            <p className="text-lg">Nu kan de andre i klubben se den og give den emojis.</p>
+          </>
+        )}
         <div className="mt-2 flex flex-wrap justify-center gap-3">
           <ButtonLink href="/kunst" variant="orange">Se galleriet</ButtonLink>
           <a href="/upload" className={buttonClass("ghost")}>Del mere</a>

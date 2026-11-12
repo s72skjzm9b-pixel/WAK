@@ -16,7 +16,7 @@ export function ArtPost({ href, src, title, nickname, avatar, width, height, pri
         <Avatar value={avatar} size="sm" />
         <p className="min-w-0 truncate font-display font-semibold text-cobalt">{nickname}</p>
       </header>
-      <Link href={href} className="block bg-lavender-soft" aria-label={`Se ${title ?? "værket"} af ${nickname}`}>
+      <Link href={href} className="art-protect block bg-lavender-soft" aria-label={`Se ${title ?? "værket"} af ${nickname}`}>
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element -- private, short-lived signed URL; must not go through a shared image cache
           <img

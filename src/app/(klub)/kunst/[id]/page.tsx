@@ -29,16 +29,15 @@ export default async function ArtworkPage({ params }: { params: Promise<{ id: st
           <IconBack className="size-6" />
         </Link>
         {urls[item.image_path] && (
-          <a href={urls[item.image_path]} target="_blank" rel="noreferrer" aria-label="Se billedet i fuld størrelse">
-            {/* eslint-disable-next-line @next/next/no-img-element -- private signed URL */}
-            <img
-              src={urls[item.image_path]}
-              alt={item.title ?? `Kunst af ${item.owner_nickname}`}
-              width={item.width}
-              height={item.height}
-              className="max-h-[78dvh] w-auto max-w-full rounded-2xl border-4 border-cream object-contain"
-            />
-          </a>
+          // eslint-disable-next-line @next/next/no-img-element -- private signed URL
+          <img
+            src={urls[item.image_path]}
+            alt={item.title ?? `Kunst af ${item.owner_nickname}`}
+            width={item.width}
+            height={item.height}
+            draggable={false}
+            className="art-protect max-h-[78dvh] w-auto max-w-full rounded-2xl border-4 border-cream object-contain"
+          />
         )}
       </div>
       <div className="space-y-5 px-4 pt-5">
