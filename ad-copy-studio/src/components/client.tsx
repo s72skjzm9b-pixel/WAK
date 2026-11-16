@@ -1,8 +1,14 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
+export interface DialogAction { label: string; value: string; primary?: boolean; danger?: boolean }
+export interface DialogSpec { title: string; body?: React.ReactNode; actions: DialogAction[]; input?: { label: string; initial?: string; placeholder?: string; multiline?: boolean; required?: boolean } }
 interface Ctx {
   name: string; setName: (n: string) => void;
+  /** Small in-app dialog. Resolves with the chosen action value (and the text, if any); 'cancel' when dismissed. */
+  ask: (spec: DialogSpec) => Promise<{ value: string; text: string }>;
+  /** Make sure a name is recorded before feedback/review actions. Returns false if the user cancels. */
+  ensureName: () => Promise<boolean>;
   status: any; reloadStatus: () => Promise<void>; toast: (m: string) => void; version: number; bump: () => void;
 }
 const C = createContext<Ctx | null>(null);
@@ -36,9 +42,19 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { reloadStatus(); }, [reloadStatus]);
   const toast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 4200); };
   const bump = () => setVersion((v) => v + 1);
+  const [dialog, setDialog] = useState<(DialogSpec & { resolve: (r: { value: string; text: string }) => void }) | null>(null);
+  const ask = (spec: DialogSpec) => new Promise<{ value: string; text: string }>((resolve) => setDialog({ ...spec, resolve }));
+  const ensureName = async () => {
+    if (current.name.trim()) return true;
+    const r = await ask({ title: 'What’s your name?', body: 'It is saved with your feedback and reviews so others know who said what. It is not a sign-in.', input: { label: 'Your name', required: true, placeholder: 'e.g. Christian' }, actions: [{ label: 'Cancel', value: 'cancel' }, { label: 'Save', value: 'ok', primary: true }] });
+    if (r.value !== 'ok' || !r.text.trim()) return false;
+    setName(r.text.trim());
+    return true;
+  };
   return (
-    <C.Provider value={{ name, setName, status, reloadStatus, toast, version, bump }}>
+    <C.Provider value={{ name, setName, status, reloadStatus, toast, version, bump, ask, ensureName }}>
       {children}
+      {dialog && <DialogView spec={dialog} onClose={(r) => { dialog.resolve(r); setDialog(null); }} />}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
     </C.Provider>
   );
@@ -85,4 +101,42 @@ export function Diff({ a, b }: { a: string; b: string }) {
   while (i < n) out.push(<del key={k++}>{A[i++]}</del>);
   while (j < m) out.push(<ins key={k++}>{B[j++]}</ins>);
   return <span className="diff">{out}</span>;
+}
+
+function DialogView({ spec, onClose }: { spec: DialogSpec; onClose: (r: { value: string; text: string }) => void }) {
+  const [text, setText] = useState(spec.input?.initial ?? '');
+  const ref = useCallback((el: HTMLElement | null) => { el?.querySelector<HTMLElement>('input, textarea, button[data-primary]')?.focus(); }, []);
+  const choose = (a: DialogAction) => { if (a.primary && spec.input?.required && !text.trim()) return; onClose({ value: a.value, text }); };
+  return (
+    <div className="dlg-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose({ value: 'cancel', text }); }}>
+      <div className="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title" ref={ref}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose({ value: 'cancel', text }); if (e.key === 'Enter' && !spec.input?.multiline && (e.target as HTMLElement).tagName === 'INPUT') { const p = spec.actions.find((a) => a.primary); if (p) choose(p); } }}>
+        <h2 id="dlg-title">{spec.title}</h2>
+        {spec.body && <div className="dlg-body">{spec.body}</div>}
+        {spec.input && (
+          <label className="field"><span>{spec.input.label}</span>
+            {spec.input.multiline ? <textarea rows={3} value={text} placeholder={spec.input.placeholder} onChange={(e) => setText(e.target.value)} />
+              : <input type="text" value={text} placeholder={spec.input.placeholder} onChange={(e) => setText(e.target.value)} />}
+          </label>
+        )}
+        <div className="dlg-actions">
+          {spec.actions.map((a) => <button key={a.value} data-primary={a.primary ? '' : undefined} className={`btn ${a.primary ? 'primary' : ''} ${a.danger ? 'danger' : ''}`} disabled={a.primary && spec.input?.required && !text.trim()} onClick={() => choose(a)}>{a.label}</button>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Small modal for short forms. Escape or clicking outside closes it. */
+export function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
+  return (
+    <div className="dlg-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="dlg" role="dialog" aria-modal="true" aria-label={title} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        ref={(el) => { if (el && !el.contains(document.activeElement)) el.querySelector<HTMLElement>('input, select, textarea, button')?.focus(); }}>
+        <h2>{title}</h2>
+        <div className="dlg-body">{children}</div>
+        {footer && <div className="dlg-actions">{footer}</div>}
+      </div>
+    </div>
+  );
 }

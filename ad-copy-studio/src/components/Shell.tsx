@@ -18,14 +18,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
     setBusy(true);
     try {
       const r = await api('/api/refresh', { body: {} });
-      toast(r.ok ? 'Copy refreshed from the Sheet.' : `Could not refresh: ${r.error?.message}. Your suggestions are safe.`);
+      toast(r.ok ? (mode === 'google' ? 'Copy refreshed from the Sheet.' : 'Reloaded.') : `Could not refresh: ${r.error?.message}. Your drafts are safe.`);
       await reloadStatus(); bump();
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   const mode = status?.mode as string | undefined;
   const last = status?.lastRead;
   const label = mode === 'google' ? (status?.auth?.state === 'ready' && last?.ok !== false ? 'Live Sheet' : 'Live Sheet — not connected')
-    : mode === 'sandbox' ? 'Practice copy (not the real Sheet)' : mode === 'snapshot' ? 'Snapshot of the Sheet · read-only' : '…';
+    : mode === 'sandbox' ? 'Practice copy' : mode === 'snapshot' ? 'Snapshot · edits saved locally' : '…';
+  const refreshLabel = mode === 'google' ? 'Refresh from Sheet' : mode === 'sandbox' ? 'Reload practice copy' : 'Reload snapshot';
   const tone = mode === 'google' && label === 'Live Sheet' ? 'ok' : mode === 'google' ? 'bad' : mode === 'sandbox' ? 'warn' : 'neutral';
   const active = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
   return (
@@ -36,10 +37,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {NAV.map((n) => <Link key={n.href} href={n.href} aria-current={active(n.href) ? 'page' : undefined}>{n.label}</Link>)}
         </nav>
         <div className="spacer" />
-        <span className={`tag ${tone}`} title={last ? `Last read ${fmtTime(last.at)}${last.ok ? '' : ` — failed: ${last.errorMessage}`}` : ''}>{label}</span>
-        <button className="btn small" onClick={refresh} disabled={busy} title="Read the latest copy from the Sheet">{busy ? 'Refreshing…' : 'Refresh'}</button>
+        <Link href="/settings" className={`tag ${tone} modetag`}>{label}</Link>
+        <button className="btn small refresh" onClick={refresh} disabled={busy}>{busy ? 'Reading…' : refreshLabel}</button>
       </header>
-      {mode === 'google' && last && !last.ok && <div className="banner bad">Couldn’t reach the Sheet ({last.errorMessage}). You can keep editing — suggestions are saved on this computer and Sheet updates wait. <Link href="/settings">Settings</Link></div>}
+      {mode === 'google' && last && !last.ok && <div className="banner bad">Couldn’t reach the Sheet ({last.errorMessage}). You can keep editing — drafts are saved on this computer and Sheet updates wait. <Link href="/settings">Settings</Link></div>}
       <main>{children}</main>
     </>
   );

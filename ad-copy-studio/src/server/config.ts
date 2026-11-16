@@ -19,6 +19,9 @@ export const config = {
   /** Extra host names the server may answer on (comma-separated, or * for any). Default: localhost only.
    *  Only for previewing in a trusted remote environment; writes still require same-origin requests. */
   allowedHosts: (env.STUDIO_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
+  /** Real writes to the live Sheet stay OFF until a fresh live read, conflict check and an explicitly authorised,
+   *  labelled test have been done. Set STUDIO_LIVE_WRITES=enabled only after that test (see README). */
+  liveWritesEnabled: env.STUDIO_LIVE_WRITES === 'enabled',
   /** Source IDs starting with this prefix are test items: never exported, never in campaign previews. */
   testIdPrefix: 'TEST',
 };

@@ -45,12 +45,12 @@ export const FORMAT_SPECS: Record<Exclude<CampaignFormat, 'unknown'>, FormatSpec
   demand_gen: {
     format: 'demand_gen', label: 'Demand Gen', pinning: false,
     fields: {
-      headline: { max: 40, source: 'Not verified in this release', verified: false },
-      description: { max: 90, source: 'Not verified in this release', verified: false },
-      'long headline': { max: 90, source: 'Not verified in this release', verified: false },
+      headline: { max: 40, source: 'Google Ads Help — Demand Gen image/video assets (answer 17140672, 17141078); not re-verified from this environment', verified: false },
+      description: { max: 90, source: 'Google Ads Help — Demand Gen assets; not re-verified from this environment', verified: false },
+      'long headline': { max: 90, source: 'Google Ads Help — Demand Gen video assets; not re-verified from this environment', verified: false },
     },
-    counts: 'Not verified in this release.',
-    notes: ['Demand Gen limits were not verified against Google documentation during implementation. Treat as provisional.'],
+    counts: 'Approximate: at least one headline and one description; long headlines are used by some Demand Gen formats.',
+    notes: ['Demand Gen rules are treated as warnings, not blocking facts. The preview borrows a Performance Max-style text layout and is labelled Approximate.'],
   },
 };
 
@@ -84,7 +84,7 @@ export function validateText(text: string, assetType: string, formats: CampaignF
     const lim = limitFor(assetType, f);
     if (!lim) continue;
     const label = FORMAT_SPECS[f as Exclude<CampaignFormat, 'unknown'>].label;
-    if (n > lim.max) out.push({ level: 'error', message: `${n}/${lim.max} characters — too long for ${label}${lim.verified ? '' : ' (provisional limit)'}.` });
+    if (n > lim.max) out.push({ level: lim.verified ? 'error' : 'warning', message: `${n}/${lim.max} characters — too long for ${label}${lim.verified ? '' : ' (approximate rule — check before use)'}.` });
   }
   if (!formats.length || formats.every((f) => !limitFor(assetType, f))) {
     out.push({ level: 'info', message: `No verified character limit applies (asset type “${assetType || 'unassigned'}”, format not assigned).` });

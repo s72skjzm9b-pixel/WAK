@@ -30,7 +30,7 @@ async function call(url: string, init?: RequestInit): Promise<any> {
 
 export class GoogleSheetsGateway implements SheetGateway {
   readonly mode = 'google' as const;
-  get canWrite() { return config.googleAccess === 'readwrite'; }
+  get canWrite() { return config.googleAccess === 'readwrite' && config.liveWritesEnabled; }
   describe() { return 'Live Google Sheet'; }
 
   async readWorkbook(): Promise<RawWorkbook> {
@@ -63,7 +63,7 @@ export class GoogleSheetsGateway implements SheetGateway {
   }
 
   async writeCells(writes: CellWrite[]): Promise<void> {
-    if (!this.canWrite) throw new SheetError('read_only', 'The connection is read-only (GOOGLE_ACCESS=readonly).');
+    if (!this.canWrite) throw new SheetError('read_only', config.liveWritesEnabled ? 'The connection is read-only (GOOGLE_ACCESS=readonly).' : 'Live Sheet writes are switched off in this version. Changes are approved locally.');
     const id = encodeURIComponent(config.spreadsheetId);
     await call(`${BASE}/${id}/values:batchUpdate`, {
       method: 'POST',

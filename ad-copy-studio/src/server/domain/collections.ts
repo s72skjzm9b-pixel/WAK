@@ -4,6 +4,7 @@
 // boundaries: e.g. New York cafés and Danish cafés are separate, and fixed brand pairs stay pairs.
 import type { CampaignFormat, Lang, ParsedWorkbook } from '../workbook/types';
 import type { CopyItem } from './library';
+import type { CollectionMeta } from '../store/repo';
 
 export interface CollectionGroup {
   campaign: string;
@@ -30,6 +31,15 @@ export interface Collection {
   sourceIds: string[];
   pairing: boolean; // fixed headline–description pairs
   previewable: boolean;
+  // Editable brief (studio metadata — never changes keys, IDs or Sheet mappings)
+  description: string;
+  imageNote: string;
+  intendedFormats: CampaignFormat[]; // editorial choice; mapped formats come from `formats`
+  studioLanguages: string[]; // languages shown by default in the studio
+  details: { finalUrl?: string; path1?: string; path2?: string; cta?: string };
+  isLocal: boolean; // created in the studio; no Sheet mapping
+  isIdeas: boolean;
+  workbookGaps: { campaign: string; assetType: string; note: string }[];
 }
 
 interface Rule {
@@ -42,7 +52,7 @@ const MARKET_NAME: Record<string, string> = { US: 'US', UK: 'UK', EU: 'EU', DK: 
 
 // Order = navigator order. Matching uses group names and campaign-name conventions from the Sheet.
 const RULES: Rule[] = [
-  { key: 'online-coffee', name: 'Online Coffee', intent: 'Buying coffee online', audience: 'Eligible online markets', note: 'Market availability to confirm',
+  { key: 'online-coffee', name: 'Coffee', intent: 'Buying coffee online', audience: 'Eligible online markets', note: 'Market availability to confirm',
     match: (_c, g) => /coffee/i.test(g) && !/brand/i.test(g), mapRow: /_PMX_(NCA|Evergreen)$/ },
   { key: 'subscriptions', name: 'Subscriptions', intent: 'Starting a coffee subscription', audience: 'Eligible subscription markets', note: 'Subscription availability to confirm',
     match: (_c, g) => /subscription/i.test(g), mapRow: /_DG_/ },
@@ -86,15 +96,18 @@ export function buildCollections(p: ParsedWorkbook, library: CopyItem[]): Collec
       key: rule.key, name: rule.name, intent: rule.intent, audience: rule.audience, destination: describeDestination(destination),
       destinationConfirmed: !!destination && !unconfirmed(destination), note: rule.note ?? null, languages, markets, formats, groups,
       sourceIds: ids, pairing: !!rule.pairing, previewable: true,
+      description: '', imageNote: '', intendedFormats: [], studioLanguages: languages, details: {}, isLocal: false, isIdeas: false,
+      workbookGaps: p.campaigns.filter((c) => groups.some((g) => g.campaign === c.name)).flatMap((c) => c.gaps.map((g) => ({ campaign: c.name, assetType: g.assetType, note: g.note }))),
     });
   }
 
   // Copy in the Sheet that no campaign tab uses yet (e.g. short introductions, the proposed “La Cabra” headline).
   const unassigned = library.filter((i) => !i.isTest && !mapped.has(i.sourceId) && !i.usages.length).map((i) => i.sourceId);
   out.push({
-    key: 'not-yet-assigned', name: 'Not yet assigned', intent: 'Format and use to be decided', audience: 'Not mapped to any ad group',
-    destination: 'Not decided', destinationConfirmed: false, note: 'No ad preview until a format is chosen', languages: [], markets: {}, formats: {},
+    key: 'not-yet-assigned', name: 'Ideas and unassigned', intent: 'Ideas and copy without a use yet', audience: 'Not mapped to any ad group',
+    destination: 'Not decided', destinationConfirmed: false, note: 'Use “Use in collection…” to give an idea a real Google field and place', languages: [], markets: {}, formats: {},
     groups: [], sourceIds: unassigned, pairing: false, previewable: false,
+    description: 'Short introductions and other ideas that are not Google Ads fields yet.', imageNote: '', intendedFormats: [], studioLanguages: ['EN'], details: {}, isLocal: false, isIdeas: true, workbookGaps: [],
   });
 
   // Seasonal workstreams from the Campaign map that have no approved source copy yet.
@@ -104,8 +117,30 @@ export function buildCollections(p: ParsedWorkbook, library: CopyItem[]): Collec
       key: isAdvent ? 'advent' : 'christmas', name: isAdvent ? 'Advent calendar' : 'Christmas', intent: m.intent, audience: 'Markets to confirm',
       destination: describeDestination(m.destination), destinationConfirmed: false, note: 'No approved seasonal copy yet', languages: [], markets: {}, formats: {},
       groups: [], sourceIds: [], pairing: false, previewable: false,
+      description: '', imageNote: '', intendedFormats: [], studioLanguages: ['EN'], details: {}, isLocal: false, isIdeas: false, workbookGaps: [],
     });
   }
+  return out;
+}
+
+/** Apply the studio's editable briefs and add local (studio-only) collections. */
+export function withBriefs(cols: Collection[], meta: Record<string, CollectionMeta>): Collection[] {
+  const out = cols.map((c) => {
+    const m = meta[c.key];
+    if (!m) return c;
+    return {
+      ...c, name: m.name?.trim() || c.name, description: m.description ?? c.description, imageNote: m.imageNote ?? c.imageNote,
+      intendedFormats: (m.formats as CampaignFormat[] | null) ?? c.intendedFormats, studioLanguages: m.languages ?? c.studioLanguages, details: { ...c.details, ...(m.details ?? {}) },
+    };
+  });
+  const ideasAt = out.findIndex((c) => c.isIdeas);
+  const locals = Object.values(meta).filter((m) => m.isLocal && !cols.some((c) => c.key === m.key)).map((m): Collection => ({
+    key: m.key, name: m.name || 'Untitled collection', intent: 'Studio collection', audience: 'Not mapped to any ad group', destination: m.details?.finalUrl || 'Not set',
+    destinationConfirmed: !!m.details?.finalUrl, note: null, languages: [], markets: {}, formats: {}, groups: [], sourceIds: [], pairing: false, previewable: true,
+    description: m.description ?? '', imageNote: m.imageNote ?? '', intendedFormats: (m.formats as CampaignFormat[] | null) ?? ['search'], studioLanguages: m.languages ?? ['EN'],
+    details: m.details ?? {}, isLocal: true, isIdeas: false, workbookGaps: [],
+  }));
+  out.splice(ideasAt >= 0 ? ideasAt : out.length, 0, ...locals);
   return out;
 }
 

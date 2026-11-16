@@ -7,12 +7,12 @@ const langAttr = (l: string) => (l === 'DK' ? 'da' : l === 'DE' ? 'de' : 'en');
 
 function SlotText({ s }: { s: ComboSlot }) {
   const cls = s.state === 'proposed' || s.state === 'editing' ? 'slot-suggested' : s.state === 'missing' ? 'slot-missing' : undefined;
-  const title = `${s.sourceId}${s.state === 'proposed' || s.state === 'editing' ? ' · suggested wording' : ''}`;
+  const title = s.state === 'proposed' || s.state === 'editing' ? 'Suggested wording' : undefined;
   return <span className={cls} title={title}>{s.state === 'missing' ? `[${s.label ?? 'missing'}]` : s.text}</span>;
 }
 const join = (slots: ComboSlot[], sep: string) => slots.map((s, i) => <span key={s.slot}>{i > 0 && sep}<SlotText s={s} /></span>);
 
-export function AdPreview({ combo, placement }: { combo: Combo; placement: PlacementKey }) {
+export function AdPreview({ combo, placement, businessName = 'La Cabra' }: { combo: Combo; placement: PlacementKey; businessName?: string }) {
   const p = PLACEMENTS[placement];
   const heads = combo.slots.filter((s) => s.slot.startsWith('H'));
   const descs = combo.slots.filter((s) => s.slot.startsWith('D'));
@@ -23,7 +23,7 @@ export function AdPreview({ combo, placement }: { combo: Combo; placement: Place
         <div className="serp-site">
           <div className="serp-fav" aria-hidden />
           <div>
-            <div style={css(p.meta)}>La Cabra</div>
+            <div style={css(p.meta)}>{businessName}</div>
             <div style={{ ...css(p.meta), color: 'var(--ink-3)', fontSize: p.meta.fontSize - 1 }}>landing page not set</div>
           </div>
         </div>
@@ -37,7 +37,7 @@ export function AdPreview({ combo, placement }: { combo: Combo; placement: Place
       <div className="pmax-img">Text-only example — no image</div>
       <div style={css(p.headline)}>{join(heads, p.headlineSeparator)}</div>
       <div style={{ ...css(p.description), marginTop: 4 }}>{join(descs, ' ')}</div>
-      <div style={{ ...css(p.meta), marginTop: 8 }}>Ad · La Cabra</div>
+      <div style={{ ...css(p.meta), marginTop: 8 }}>Ad · {businessName}</div>
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { Repo, newId, now, type Approval, type Revision, type RevisionKind, type
 import { tx } from '../store/db';
 import { buildCollections } from './collections';
 
+export const CANONICAL_LANGS = ['EN', 'DK', 'DE'];
+
 export interface Actor { role: string; name: string }
 const who = (a: Actor) => `${a.name || 'Unnamed'} (${a.role})`;
 
@@ -39,6 +41,22 @@ export class Studio {
     if (!this.gateways[m]) throw new StudioError(400, `Mode ${m} is not available.`);
     this.repo.setSetting('mode', m);
     this.cache = null;
+  }
+  /** Switching to the live Sheet is only allowed once a real read succeeds. */
+  async switchMode(m: GatewayMode) {
+    if (!this.gateways[m]) throw new StudioError(400, `Mode ${m} is not available.`);
+    if (m === 'google') {
+      try { await this.gateways.google!().readWorkbook(); }
+      catch (e) { throw new StudioError(409, `The live Sheet isn’t connected yet: ${describeError(e).message}`); }
+    }
+    this.setMode(m);
+    return this.refresh();
+  }
+  /** Can a read of the live Sheet succeed right now? (Used to enable the Live option.) */
+  async liveReadable(): Promise<{ ok: boolean; message: string }> {
+    if (!this.gateways.google) return { ok: false, message: 'Not available.' };
+    try { await this.gateways.google().readWorkbook(); return { ok: true, message: 'The live Sheet can be read.' }; }
+    catch (e) { return { ok: false, message: describeError(e).message }; }
   }
   gateway(): SheetGateway {
     const g = this.gateways[this.mode()];
@@ -107,7 +125,9 @@ export class Studio {
     if (rev.language !== 'EN') {
       // A translation approval covers its wording AND the English it translates.
       // Replacements: that English must be the Sheet's current English. Variations: the linked English variation.
-      const englishRef = rev.kind === 'variation' ? rev.englishBasis : this.englishNow(item);
+      const englishRef = rev.kind === 'variation'
+        ? (this.repo.listRevisions({ sourceId: rev.sourceId, language: 'EN' }).find((r) => r.kind === 'variation' && !['withdrawn', 'superseded'].includes(r.state))?.proposedText ?? rev.englishBasis)
+        : this.englishNow(item);
       if (a.englishFp !== fp(englishRef)) return { valid: false, approval: a, reason: 'The English source changed after this translation was approved' };
     }
     return { valid: true, approval: a };
@@ -142,7 +162,7 @@ export class Studio {
 
     if (input.kind === 'replace' || input.kind === 'retire') {
       if (!item) throw new StudioError(404, `Source ID ${sourceId} is not in the current Sheet read.`);
-      baseText = item.versions[input.language].text;
+      baseText = item.versions[input.language]?.text ?? '';
       if (input.kind === 'replace' && input.language !== 'EN' && !baseText) {
         // Translating a line that has no translation yet is still a replacement of a blank cell.
       }
@@ -171,7 +191,7 @@ export class Studio {
       id: newId('rev'), kind: input.kind, sourceId, language: input.language, baseText, baseFp: fp(baseText), baseReadId: wb.readId,
       proposedText: input.kind === 'retire' ? '' : input.proposedText, englishBasis: input.kind === 'retire' ? '' : englishBasis,
       englishBasisFp: fp(input.kind === 'retire' ? '' : englishBasis), reason: input.reason ?? '', meta, state: 'draft', syncState: 'none',
-      syncDetail: '', isTest, createdBy: who(actor), createdAt: now(), updatedAt: now(),
+      syncDetail: '', isTest, createdBy: who(actor), createdAt: now(), updatedAt: now(), readyAt: null, appliedAt: null, appliedBy: null, archivedAt: null,
     };
     tx(this.repo.db, () => {
       this.repo.insertRevision(rev);
@@ -209,6 +229,7 @@ export class Studio {
         next.state = 'draft'; next.syncState = 'none'; next.syncDetail = '';
         this.repo.addEvent(id, who(actor), revoked ? 'approval_invalidated' : 'returned_to_draft', rev.state, 'draft', { reason: 'Wording edited', previousText: rev.proposedText, newText: patch.proposedText });
       }
+      if (next.state === 'draft') next.readyAt = null;
       this.repo.updateRevision(id, next);
       if (textChanged) this.repo.addEvent(id, who(actor), 'edited', null, null, { from: rev.proposedText, to: patch.proposedText });
       // English edits: translation proposals for the same line need re-review.
@@ -230,7 +251,8 @@ export class Studio {
     const rev = this.mustRevision(id);
     if (!['draft', 'changes_requested'].includes(rev.state)) throw new StudioError(409, `Cannot submit a proposal that is ${rev.state}.`);
     if (rev.kind !== 'retire' && !rev.proposedText.trim()) throw new StudioError(400, 'Wording is empty.');
-    this.transition(rev, 'submitted', actor, 'submitted');
+    this.transition(rev, 'submitted', actor, 'ready_for_review');
+    this.repo.updateRevision(id, { readyAt: now() });
     return this.mustRevision(id);
   }
 
@@ -303,6 +325,39 @@ export class Studio {
     };
   }
 
+  /** Translations may only be approved against English that is itself approved (and unchanged since). */
+  assertEnglishReady(rev: Revision, item: CopyItem | null) {
+    if (rev.language === 'EN' || rev.kind === 'retire') return;
+    if (rev.kind === 'variation') {
+      const en = this.repo.listRevisions({ sourceId: rev.sourceId, language: 'EN' }).find((r) => r.kind === 'variation' && !['withdrawn', 'superseded'].includes(r.state));
+      if (!en || !['approved', 'written'].includes(en.state)) throw new StudioError(409, 'Approve the English of this new line first; its translations follow it.');
+      if (en.proposedText !== rev.englishBasis) throw new StudioError(409, 'The English changed after this translation was written. Check the translation against the current English first.');
+      return;
+    }
+    const openEn = this.repo.listRevisions({ sourceId: rev.sourceId, language: 'EN' }).find((r) => r.kind === 'replace' && ['draft', 'submitted', 'changes_requested', 'approved'].includes(r.state));
+    if (openEn) throw new StudioError(409, 'The English of this line is being changed. Approve the English first, then check this translation against it.');
+    if (item && rev.englishBasis !== item.versions.EN.text) throw new StudioError(409, 'The English changed after this translation was written. Check the translation against the current English first.');
+  }
+
+  /** Anabelle (or whoever applies changes) confirms it is done. Moves the item to history. For written
+   *  replacements this also advances the Sheet's saved reference so the row leaves “Updates for Anabelle”. */
+  async markApplied(id: string, actor: Actor) {
+    const rev = this.mustRevision(id);
+    if (rev.appliedAt) return { ok: true, message: 'Already done.' };
+    let message = 'Marked as done.';
+    if (rev.kind === 'replace' && rev.state === 'written' && CANONICAL_LANGS.includes(rev.language)) {
+      const ack = await this.acknowledge({ revisionId: id, sourceId: rev.sourceId, language: rev.language, appliedText: rev.proposedText }, actor);
+      if (this.gateway().canWrite) {
+        const r = await this.advanceReference(ack.id, actor);
+        if (!r.ok) return { ok: false, message: `Recorded as applied, but the Sheet’s comparison could not be cleared: ${r.message}` };
+        message = 'Marked as applied. It is cleared from “Updates for Anabelle”.';
+      } else message = 'Marked as applied. (The Sheet’s comparison will be cleared when connected.)';
+    } else if (!['approved', 'written'].includes(rev.state)) throw new StudioError(409, 'Only approved changes can be marked as applied or registered.');
+    this.repo.updateRevision(id, { appliedAt: now(), appliedBy: who(actor) });
+    this.repo.addEvent(id, who(actor), rev.kind === 'variation' ? 'registered' : 'applied', rev.state, rev.state, { note: 'Confirmed by a person; not verified against Google Ads.' });
+    return { ok: true, message };
+  }
+
   /** Approve the exact wording. For replacements of existing lines, optionally update the Sheet in the same explicit action. */
   async approve(id: string, actor: Actor, opts: { updateSheet: boolean; note?: string }) {
     const rev = this.mustRevision(id);
@@ -312,15 +367,13 @@ export class Studio {
       const errs = this.validationsFor(rev.proposedText, item, rev.meta).filter((v) => v.level === 'error');
       if (errs.length) throw new StudioError(422, `Fix before approving: ${errs.map((e) => e.message).join(' ')}`);
     }
-    if (rev.kind === 'replace' && rev.language !== 'EN' && item && rev.englishBasis !== item.versions.EN.text) {
-      throw new StudioError(409, 'This translation was drafted against different English than the Sheet now holds. Update it against the current English first.');
-    }
+    this.assertEnglishReady(rev, item);
     const englishText = rev.kind === 'retire' ? '' : rev.englishBasis;
     const approval: Approval = {
       id: newId('apr'), revisionId: id, sourceId: rev.sourceId, language: rev.language, text: rev.proposedText, textFp: fp(rev.proposedText),
       englishText, englishFp: fp(englishText), approvedBy: who(actor), approvedAt: now(), note: opts.note ?? '', revokedAt: null, revokedReason: null,
     };
-    const localOnly = rev.kind !== 'replace';
+    const localOnly = rev.kind !== 'replace' || !CANONICAL_LANGS.includes(rev.language);
     tx(this.repo.db, () => {
       this.repo.insertApproval(approval);
       this.repo.updateRevision(id, {
@@ -329,7 +382,8 @@ export class Studio {
         syncDetail: localOnly
           ? (rev.kind === 'variation'
             ? 'Approved locally. New IDs are not written to the Sheet in this release: the Updates for Anabelle FILTER only covers existing Change reference rows, so an appended row would be invisible. Register the ID manually (see README) before campaign use.'
-            : 'Retirement approved locally. The line is not deleted from the Sheet; Anabelle removes or pauses the asset in the listed groups.')
+            : rev.kind === 'replace' ? `Approved locally. ${rev.language} has no column in the master Sheet yet, so it stays local only.`
+          : 'Retirement approved locally. The line is not deleted from the Sheet; Anabelle removes or pauses the asset in the listed groups.')
           : 'Approved. Sheet not updated yet.',
       });
       this.repo.addEvent(id, who(actor), 'approved', 'submitted', 'approved', { approvalId: approval.id, text: rev.proposedText, englishBasis: englishText, note: opts.note });

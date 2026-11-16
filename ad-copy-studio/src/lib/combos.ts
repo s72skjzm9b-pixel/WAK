@@ -10,7 +10,8 @@ export interface PoolAsset {
   sourceId: string;
   assetType: string; // Headline | Description | Long headline …
   text: string;
-  linkedHeadline: string | null; // descriptions that must appear with a specific headline
+  linkedHeadline: string | null; // legacy literal pairing (fallback only)
+  linkedHeadlineId?: string | null; // stable pairing: description must appear with this headline
   state: 'sheet' | 'proposed' | 'editing' | 'missing';
   label?: string; // e.g. "Proposed revision", "Not yet translated"
 }
@@ -50,6 +51,7 @@ export function comboKey(c: Omit<Combo, 'key'>): string {
 /** Explicit headline–description pairs: a description with a linked headline may only appear with it. */
 function pairsOk(heads: PoolAsset[], descs: PoolAsset[], englishHeadlineById: Map<string, string>): boolean {
   for (const d of descs) {
+    if (d.linkedHeadlineId) { if (!heads.some((h) => h.sourceId === d.linkedHeadlineId)) return false; continue; }
     if (!d.linkedHeadline) continue;
     const ok = heads.some((h) => (englishHeadlineById.get(h.sourceId) ?? h.text) === d.linkedHeadline);
     if (!ok) return false;
@@ -57,7 +59,7 @@ function pairsOk(heads: PoolAsset[], descs: PoolAsset[], englishHeadlineById: Ma
   return true;
 }
 
-const MAX_ENUMERATED = 60_000;
+const MAX_ENUMERATED = 4_000; // representative previews only; never tens of thousands per keystroke
 
 export function generateCombos(ctx: GroupContext, englishHeadlineById: Map<string, string> = new Map()): { all: Combo[]; total: number; truncated: boolean; notes: string[] } {
   const notes: string[] = [];

@@ -12,6 +12,8 @@ export interface RevisionMeta {
   assetType?: string;
   intent?: string;
   linkedHeadline?: string | null;
+  linkedHeadlineId?: string | null; // stable pairing (description → headline source ID)
+  separatedFrom?: string | null; // a separate version made from shared wording
   targets?: { campaign: string; group: string }[]; // variations: where it is intended to be used
   previewFormat?: string;
   collection?: string; // collection a new line was added in
@@ -38,6 +40,10 @@ export interface Revision {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  readyAt: string | null; // marked Ready for review
+  appliedAt: string | null; // applied in Google Ads / registered — moves to history
+  appliedBy: string | null;
+  archivedAt: string | null;
 }
 
 export interface Approval {
@@ -49,6 +55,7 @@ export interface Approval {
 export interface FeedbackRow {
   id: string; comboKey: string; combo: any; verdict: 'works' | 'needs_changes' | 'comment';
   reasons: string[]; comment: string; reviewer: string; createdAt: string; resolvedAt: string | null; resolution: string | null;
+  supersededAt?: string | null; scope?: { kind: 'combination' | 'lines'; lines?: { sourceId: string; slot: string }[] }; language?: string;
 }
 
 export interface Acknowledgement {
@@ -70,6 +77,7 @@ const toRevision = (r: any): Revision => ({
   baseReadId: r.base_read_id, proposedText: r.proposed_text, englishBasis: r.english_basis, englishBasisFp: r.english_basis_fp,
   reason: r.reason, meta: JSON.parse(r.meta_json), state: r.state, syncState: r.sync_state, syncDetail: r.sync_detail,
   isTest: !!r.is_test, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
+  readyAt: r.ready_at ?? null, appliedAt: r.applied_at ?? null, appliedBy: r.applied_by ?? null, archivedAt: r.archived_at ?? null,
 });
 const toApproval = (r: any): Approval => ({
   id: r.id, revisionId: r.revision_id, sourceId: r.source_id, language: r.language, text: r.text, textFp: r.text_fp,
@@ -108,6 +116,12 @@ export class Repo {
   }
 
   // ---- revisions
+  getRead(id: number | null): { id: number; mode: string; finishedAt: string; readAt: string | null } | null {
+    if (id == null) return null;
+    const r = this.db.prepare('SELECT id, mode, finished_at FROM sheet_reads WHERE id = ?').get(id) as any;
+    return r ? { id: r.id, mode: r.mode, finishedAt: r.finished_at, readAt: r.finished_at } : null;
+  }
+
   insertRevision(r: Revision) {
     this.db.prepare(`INSERT INTO revisions (id, kind, source_id, language, base_text, base_fp, base_read_id, proposed_text,
       english_basis, english_basis_fp, reason, meta_json, state, sync_state, sync_detail, is_test, created_by, created_at, updated_at)
@@ -115,11 +129,11 @@ export class Repo {
       r.id, r.kind, r.sourceId, r.language, r.baseText, r.baseFp, r.baseReadId, r.proposedText, r.englishBasis, r.englishBasisFp,
       r.reason, JSON.stringify(r.meta), r.state, r.syncState, r.syncDetail, r.isTest ? 1 : 0, r.createdBy, r.createdAt, r.updatedAt);
   }
-  updateRevision(id: string, patch: Partial<Pick<Revision, 'proposedText' | 'englishBasis' | 'englishBasisFp' | 'reason' | 'meta' | 'state' | 'syncState' | 'syncDetail' | 'sourceId' | 'baseText' | 'baseFp'>>) {
+  updateRevision(id: string, patch: Partial<Pick<Revision, 'proposedText' | 'englishBasis' | 'englishBasisFp' | 'reason' | 'meta' | 'state' | 'syncState' | 'syncDetail' | 'sourceId' | 'baseText' | 'baseFp' | 'readyAt' | 'appliedAt' | 'appliedBy' | 'archivedAt'>>) {
     const cols: Record<string, string> = {
       proposedText: 'proposed_text', englishBasis: 'english_basis', englishBasisFp: 'english_basis_fp', reason: 'reason',
       meta: 'meta_json', state: 'state', syncState: 'sync_state', syncDetail: 'sync_detail', sourceId: 'source_id',
-      baseText: 'base_text', baseFp: 'base_fp',
+      baseText: 'base_text', baseFp: 'base_fp', readyAt: 'ready_at', appliedAt: 'applied_at', appliedBy: 'applied_by', archivedAt: 'archived_at',
     };
     const sets: string[] = [], vals: any[] = [];
     for (const [k, v] of Object.entries(patch)) { sets.push(`${cols[k]} = ?`); vals.push(k === 'meta' ? JSON.stringify(v) : v); }
@@ -201,6 +215,7 @@ export class Repo {
     return this.db.prepare('SELECT * FROM feedback ORDER BY created_at DESC').all().map((r: any) => ({
       id: r.id, comboKey: r.combo_key, combo: JSON.parse(r.combo_json), verdict: r.verdict, reasons: JSON.parse(r.reasons_json),
       comment: r.comment, reviewer: r.reviewer, createdAt: r.created_at, resolvedAt: r.resolved_at, resolution: r.resolution,
+      supersededAt: r.superseded_at ?? null, scope: r.scope_json ? JSON.parse(r.scope_json) : { kind: 'combination' }, language: r.language ?? JSON.parse(r.combo_json).language,
     }));
   }
 
@@ -249,4 +264,69 @@ export class Repo {
     const r = this.db.prepare('SELECT * FROM export_batches WHERE id = ?').get(id) as any;
     return r ? { id: r.id, createdAt: r.created_at, csv: r.csv as string, label: r.label as string, items: JSON.parse(r.items_json) } : null;
   }
+
+  // ---- collection briefs (labels and editorial settings only; never mappings)
+  collectionMeta(): Record<string, CollectionMeta> {
+    const out: Record<string, CollectionMeta> = {};
+    for (const r of this.db.prepare('SELECT * FROM collections_meta').all() as any[]) {
+      out[r.key] = { key: r.key, name: r.name, description: r.description, imageNote: r.image_note, formats: r.formats_json ? JSON.parse(r.formats_json) : null,
+        languages: r.languages_json ? JSON.parse(r.languages_json) : null, details: r.details_json ? JSON.parse(r.details_json) : {}, isLocal: !!r.is_local, createdAt: r.created_at };
+    }
+    return out;
+  }
+  saveCollectionMeta(m: Partial<CollectionMeta> & { key: string }, by: string) {
+    const cur = this.collectionMeta()[m.key];
+    const v = { ...(cur ?? { name: null, description: null, imageNote: null, formats: null, languages: null, details: {}, isLocal: false }), ...m };
+    this.db.prepare(`INSERT INTO collections_meta (key, name, description, image_note, formats_json, languages_json, details_json, is_local, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET name = excluded.name, description = excluded.description, image_note = excluded.image_note,
+      formats_json = excluded.formats_json, languages_json = excluded.languages_json, details_json = excluded.details_json, updated_at = excluded.updated_at`)
+      .run(m.key, v.name, v.description, v.imageNote, v.formats ? JSON.stringify(v.formats) : null, v.languages ? JSON.stringify(v.languages) : null,
+        JSON.stringify(v.details ?? {}), v.isLocal ? 1 : 0, by, cur?.createdAt ?? now(), now());
+  }
+
+  // ---- intended uses (studio intent; separate from factual Sheet mappings)
+  intendedUses(sourceId?: string): IntendedUse[] {
+    const rows = sourceId ? this.db.prepare('SELECT * FROM intended_uses WHERE source_id = ? AND removed_at IS NULL').all(sourceId) : this.db.prepare('SELECT * FROM intended_uses WHERE removed_at IS NULL').all();
+    return (rows as any[]).map((r) => ({ id: r.id, sourceId: r.source_id, collection: r.collection_key, field: r.field, format: r.format, campaign: r.campaign, group: r.grp, createdBy: r.created_by, createdAt: r.created_at }));
+  }
+  addIntendedUse(u: Omit<IntendedUse, 'id' | 'createdAt'>): IntendedUse {
+    const existing = this.intendedUses(u.sourceId).find((x) => x.collection === u.collection && (x.format ?? null) === (u.format ?? null) && (x.campaign ?? null) === (u.campaign ?? null) && (x.group ?? null) === (u.group ?? null));
+    if (existing) return existing;
+    const row = { ...u, id: newId('use'), createdAt: now() };
+    this.db.prepare('INSERT INTO intended_uses (id, source_id, collection_key, field, format, campaign, grp, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(row.id, row.sourceId, row.collection, row.field ?? null, row.format ?? null, row.campaign ?? null, row.group ?? null, row.createdBy, row.createdAt);
+    return row;
+  }
+  removeIntendedUse(id: string) { this.db.prepare('UPDATE intended_uses SET removed_at = ? WHERE id = ?').run(now(), id); }
+
+  // ---- extra languages (local only until the Sheet has a canonical column)
+  languages(): { code: string; name: string; locale: string | null }[] {
+    return (this.db.prepare('SELECT code, name, locale FROM languages ORDER BY created_at').all() as any[]).map((r) => ({ code: r.code, name: r.name, locale: r.locale }));
+  }
+  addLanguage(code: string, name: string, locale: string | null) {
+    this.db.prepare('INSERT INTO languages (code, name, locale, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(code) DO NOTHING').run(code, name, locale, now());
+  }
+
+  // ---- reversible verdicts
+  activeVerdicts(): FeedbackRow[] { return this.listFeedback().filter((f: any) => !f.supersededAt && !f.resolvedAt && f.verdict !== 'comment'); }
+  supersedeFeedback(id: string) { this.db.prepare('UPDATE feedback SET superseded_at = ? WHERE id = ? AND superseded_at IS NULL').run(now(), id); }
+  setFeedbackMeta(id: string, scope: object, language: string) { this.db.prepare('UPDATE feedback SET scope_json = ?, language = ? WHERE id = ?').run(JSON.stringify(scope), language, id); }
+
+  // ---- comments
+  comments(): CommentRow[] {
+    return (this.db.prepare('SELECT * FROM comments ORDER BY created_at').all() as any[]).map((r) => ({ id: r.id, comboKey: r.combo_key, combo: JSON.parse(r.combo_json), language: r.language, text: r.text,
+      author: r.author, createdAt: r.created_at, editedAt: r.edited_at, deletedAt: r.deleted_at, resolvedAt: r.resolved_at }));
+  }
+  addComment(c: { comboKey: string; combo: any; language: string; text: string; author: string }): string {
+    const id = newId('cm');
+    this.db.prepare('INSERT INTO comments (id, combo_key, combo_json, language, text, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, c.comboKey, JSON.stringify(c.combo), c.language, c.text, c.author, now());
+    return id;
+  }
+  editComment(id: string, text: string) { this.db.prepare('UPDATE comments SET text = ?, edited_at = ? WHERE id = ? AND deleted_at IS NULL').run(text, now(), id); }
+  deleteComment(id: string) { this.db.prepare('UPDATE comments SET deleted_at = ? WHERE id = ?').run(now(), id); }
+  resolveComment(id: string, resolved: boolean) { this.db.prepare('UPDATE comments SET resolved_at = ? WHERE id = ?').run(resolved ? now() : null, id); }
 }
+
+export interface CollectionMeta { key: string; name: string | null; description: string | null; imageNote: string | null; formats: string[] | null; languages: string[] | null; details: { finalUrl?: string; path1?: string; path2?: string; cta?: string }; isLocal: boolean; createdAt?: string }
+export interface IntendedUse { id: string; sourceId: string; collection: string; field: string | null; format: string | null; campaign: string | null; group: string | null; createdBy: string; createdAt: string }
+export interface CommentRow { id: string; comboKey: string; combo: any; language: string; text: string; author: string; createdAt: string; editedAt: string | null; deletedAt: string | null; resolvedAt: string | null }

@@ -43,6 +43,8 @@ export interface CopyItem {
   theme: string;
   assetType: string;
   linkedHeadline: string | null;
+  /** Stable pairing: the source ID of the headline this description must appear with. */
+  linkedHeadlineId: string | null;
   intent: string;
   scope: string;
   destination: string;
@@ -85,9 +87,11 @@ export function buildLibrary(p: ParsedWorkbook): CopyItem[] {
       if (m.sourceId === s.sourceId) usages.push({ campaign: c.name, group: m.group, format: c.format, market: c.market, language: c.language, assetType: m.assetType });
     }
     const linked = s.linkedHeadline && !/section-level|unassigned/i.test(s.linkedHeadline) ? s.linkedHeadline : null;
+    const heads = linked ? p.source.filter((h) => h.sourceId !== s.sourceId && /headline/i.test(h.assetType) && h.english === linked) : [];
+    const linkedId = (heads.find((h) => h.theme === s.theme) ?? heads[0])?.sourceId ?? null;
     const v = (lang: Lang, text: string, status: string, ref: LangVersion['ref']): LangVersion => ({ lang, text, fp: fp(text), sheetStatus: status, ref });
     return {
-      sourceId: s.sourceId, isTest: isTestId(s.sourceId), theme: s.theme, assetType: s.assetType, linkedHeadline: linked,
+      sourceId: s.sourceId, isTest: isTestId(s.sourceId), theme: s.theme, assetType: s.assetType, linkedHeadline: linked, linkedHeadlineId: linkedId,
       intent: s.intent, scope: s.scope, destination: s.destination, usageRule: s.usageRule, sheetStatus: s.status,
       shortened: s.shortened, note: t?.note ?? '',
       versions: {

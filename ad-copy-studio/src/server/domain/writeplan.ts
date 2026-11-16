@@ -122,6 +122,17 @@ export function planReplacement(p: ParsedWorkbook, input: PlanInput): WritePlan 
     if (ev.action === 'No pending change') warnings.push('The new wording equals the saved reference, so nothing will appear in Updates for Anabelle (the change reverts to what she last applied).');
   }
 
+  // Pairing integrity: descriptions name their headline by its English wording (Source copy, linked headline column).
+  // When a paired headline's English changes, update those links in the same write so the pairs survive.
+  if (lang === 'EN' && src.row && p.sourceCols.linked && input.baseText && input.proposedText !== input.baseText) {
+    for (const dep of p.source.filter((r) => r.sourceId !== sourceId && r.linkedHeadline === input.baseText)) {
+      const ref = a1(TAB.source, p.sourceCols.linked.index, dep.row);
+      cells.push({ ref, tab: TAB.source, row: dep.row, column: p.sourceCols.linked.header, expectedBefore: input.baseText, after: input.proposedText, purpose: `Keep ${dep.sourceId} paired with this headline` });
+      mustNotBeFormula.push(ref);
+      guards.push({ ref, equals: input.baseText, why: `Pairing of ${dep.sourceId} unchanged` });
+    }
+  }
+
   // English edits flag translations.
   if (lang === 'EN') {
     for (const r of p.changeRef.filter((x) => x.sourceId === sourceId && x.lang !== 'EN')) {
