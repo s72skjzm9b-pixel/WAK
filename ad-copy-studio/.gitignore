@@ -1,0 +1,10 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+# Local data: database, sandbox workbook, backups, OAuth tokens and keys
+data/
+.env.local
+.env*.local
+*.pem
+service-account*.json
