@@ -16,6 +16,9 @@ export const config = {
   dataDir: path.resolve(env.STUDIO_DATA_DIR || path.join(os.homedir(), '.la-cabra-ad-copy-studio')),
   /** Optional override of the starting connection mode: google | snapshot | sandbox */
   forcedMode: env.SHEET_MODE as 'google' | 'snapshot' | 'sandbox' | undefined,
+  /** Extra host names the server may answer on (comma-separated, or * for any). Default: localhost only.
+   *  Only for previewing in a trusted remote environment; writes still require same-origin requests. */
+  allowedHosts: (env.STUDIO_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
   /** Source IDs starting with this prefix are test items: never exported, never in campaign previews. */
   testIdPrefix: 'TEST',
 };

@@ -20,7 +20,8 @@ npm start
 
 Open <http://localhost:3100>. Stop with `Ctrl+C` in that terminal. `./start.sh` does install → build → start in one go.
 For development with live reload: `npm run dev`. The server only listens on 127.0.0.1 and refuses requests
-addressed to any other host name.
+addressed to any other host name. (To view it through a trusted remote preview, start it with
+`STUDIO_ALLOWED_HOSTS='*' npm start`; writes still require same-origin requests carrying the app's header.)
 
 Until Google is connected the studio opens in **Snapshot** mode: the real wording of the workbook as captured
 on 16 Nov 2026 (`seed/workbook-snapshot.json`), read-only and labelled as a snapshot everywhere.

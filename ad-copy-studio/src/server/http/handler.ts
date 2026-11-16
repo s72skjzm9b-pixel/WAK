@@ -3,8 +3,14 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { StudioError, type Actor } from '../domain/studio';
 import { SheetError } from '../sheets/gateway';
 import { getStudio } from '../instance';
+import { config } from '../config';
 
 const LOCAL_HOSTS = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+function hostAllowed(host: string): boolean {
+  if (LOCAL_HOSTS.test(host)) return true;
+  const name = host.toLowerCase().replace(/:\d+$/, '');
+  return config.allowedHosts.includes('*') || config.allowedHosts.includes(name);
+}
 
 /** Role switching is a local convenience, not authentication. The role is recorded for history only. */
 export function actorFrom(req: NextRequest): Actor {
@@ -20,10 +26,10 @@ export function route(fn: Handler, opts: { mutating?: boolean } = {}) {
     // Local prototype hardening: only answer requests addressed to this machine, and require the
     // app's custom header on writes so other websites cannot post to the local server.
     const host = req.headers.get('host') || '';
-    if (!LOCAL_HOSTS.test(host)) return NextResponse.json({ error: 'This local app only answers on localhost.' }, { status: 403 });
+    if (!hostAllowed(host)) return NextResponse.json({ error: 'This local app only answers on localhost.' }, { status: 403 });
     if (opts.mutating) {
       const origin = req.headers.get('origin');
-      if (origin && !LOCAL_HOSTS.test(new URL(origin).host)) return NextResponse.json({ error: 'Cross-site request refused.' }, { status: 403 });
+      if (origin && new URL(origin).host !== host && !hostAllowed(new URL(origin).host)) return NextResponse.json({ error: 'Cross-site request refused.' }, { status: 403 });
       if (!req.headers.get('x-studio-role')) return NextResponse.json({ error: 'Missing role header.' }, { status: 400 });
     }
     try {
