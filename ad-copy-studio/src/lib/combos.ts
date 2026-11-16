@@ -105,6 +105,11 @@ export function generateCombos(ctx: GroupContext, englishHeadlineById: Map<strin
         out.push({ ...base, slots: [slot('H1', a), slot('H2', b), slot('D1', d)] });
       }
     }
+    if (!out.length && heads.length === 1 && descs.length >= 1) {
+      // Fixed pair: one headline with each of its own descriptions (no mixing across pairs).
+      notes.push('Fixed pair: this headline is shown only with its own descriptions.');
+      for (const d of descs) if (pairsOk([heads[0]], [d], englishHeadlineById)) out.push({ ...base, slots: [slot('H1', heads[0]), slot('D1', d)] });
+    }
   } else {
     // PMax / Demand Gen: no pinning. Any headline can meet any description in the group.
     outer2: for (const d of descs) for (const a of heads) {

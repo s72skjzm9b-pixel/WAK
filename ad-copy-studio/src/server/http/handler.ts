@@ -13,10 +13,11 @@ function hostAllowed(host: string): boolean {
 }
 
 /** Role switching is a local convenience, not authentication. The role is recorded for history only. */
+/** This local prototype has no sign-in. The optional name (Settings) is recorded in history only.
+ *  Before any shared deployment, replace this with real authentication and permissions. */
 export function actorFrom(req: NextRequest): Actor {
-  const role = (req.headers.get('x-studio-role') || '').slice(0, 40);
   const name = decodeURIComponent(req.headers.get('x-studio-name') || '').slice(0, 60);
-  return { role: role || 'Unknown role', name };
+  return { role: 'Local user', name: name || 'Local user' };
 }
 
 type Handler = (req: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<unknown>;
@@ -30,7 +31,7 @@ export function route(fn: Handler, opts: { mutating?: boolean } = {}) {
     if (opts.mutating) {
       const origin = req.headers.get('origin');
       if (origin && new URL(origin).host !== host && !hostAllowed(new URL(origin).host)) return NextResponse.json({ error: 'Cross-site request refused.' }, { status: 403 });
-      if (!req.headers.get('x-studio-role')) return NextResponse.json({ error: 'Missing role header.' }, { status: 400 });
+      if (!req.headers.get('x-studio-client')) return NextResponse.json({ error: 'Missing app header.' }, { status: 400 });
     }
     try {
       const out = await fn(req, ctx);

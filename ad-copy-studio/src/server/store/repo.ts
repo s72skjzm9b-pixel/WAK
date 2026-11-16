@@ -14,6 +14,7 @@ export interface RevisionMeta {
   linkedHeadline?: string | null;
   targets?: { campaign: string; group: string }[]; // variations: where it is intended to be used
   previewFormat?: string;
+  collection?: string; // collection a new line was added in
   basedOnRevisionId?: string | null; // translation drafted against a proposed English revision
 }
 
@@ -114,10 +115,11 @@ export class Repo {
       r.id, r.kind, r.sourceId, r.language, r.baseText, r.baseFp, r.baseReadId, r.proposedText, r.englishBasis, r.englishBasisFp,
       r.reason, JSON.stringify(r.meta), r.state, r.syncState, r.syncDetail, r.isTest ? 1 : 0, r.createdBy, r.createdAt, r.updatedAt);
   }
-  updateRevision(id: string, patch: Partial<Pick<Revision, 'proposedText' | 'englishBasis' | 'englishBasisFp' | 'reason' | 'meta' | 'state' | 'syncState' | 'syncDetail' | 'sourceId'>>) {
+  updateRevision(id: string, patch: Partial<Pick<Revision, 'proposedText' | 'englishBasis' | 'englishBasisFp' | 'reason' | 'meta' | 'state' | 'syncState' | 'syncDetail' | 'sourceId' | 'baseText' | 'baseFp'>>) {
     const cols: Record<string, string> = {
       proposedText: 'proposed_text', englishBasis: 'english_basis', englishBasisFp: 'english_basis_fp', reason: 'reason',
       meta: 'meta_json', state: 'state', syncState: 'sync_state', syncDetail: 'sync_detail', sourceId: 'source_id',
+      baseText: 'base_text', baseFp: 'base_fp',
     };
     const sets: string[] = [], vals: any[] = [];
     for (const [k, v] of Object.entries(patch)) { sets.push(`${cols[k]} = ?`); vals.push(k === 'meta' ? JSON.stringify(v) : v); }

@@ -2,55 +2,44 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { ROLES, useStudio, api, fmtTime, type Role } from './client';
+import { useStudio, api, fmtTime } from './client';
 
 const NAV = [
-  { href: '/write', label: 'Write' },
-  { href: '/review', label: 'Review' },
-  { href: '/handover', label: 'Handover' },
-  { href: '/connection', label: 'Connection' },
+  { href: '/', label: 'Workspace' },
+  { href: '/changes', label: 'Changes' },
+  { href: '/settings', label: 'Settings' },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  const path = usePathname();
-  const { role, setRole, name, setName, status, reloadStatus, toast, bump } = useStudio();
+  const path = usePathname() ?? '/';
+  const { status, reloadStatus, toast, bump } = useStudio();
   const [busy, setBusy] = useState(false);
   const refresh = async () => {
     setBusy(true);
     try {
       const r = await api('/api/refresh', { body: {} });
-      toast(r.ok ? 'Workbook refreshed.' : `Refresh failed: ${r.error?.message}`);
+      toast(r.ok ? 'Copy refreshed from the Sheet.' : `Could not refresh: ${r.error?.message}. Your suggestions are safe.`);
       await reloadStatus(); bump();
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   const mode = status?.mode as string | undefined;
   const last = status?.lastRead;
-  const modeLabel = mode === 'google' ? 'Live Google Sheet' : mode === 'sandbox' ? 'Sandbox — practice copy, not the real Sheet' : mode === 'snapshot' ? 'Snapshot of the real workbook (read-only)' : 'Connecting…';
+  const label = mode === 'google' ? (status?.auth?.state === 'ready' && last?.ok !== false ? 'Live Sheet' : 'Live Sheet — not connected')
+    : mode === 'sandbox' ? 'Practice copy (not the real Sheet)' : mode === 'snapshot' ? 'Snapshot of the Sheet · read-only' : '…';
+  const tone = mode === 'google' && label === 'Live Sheet' ? 'ok' : mode === 'google' ? 'bad' : mode === 'sandbox' ? 'warn' : 'neutral';
+  const active = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
   return (
     <>
       <header className="topbar">
         <Link href="/" className="brand">La Cabra <span>Ad Copy Studio</span></Link>
         <nav className="nav" aria-label="Main">
-          {NAV.map((n) => <Link key={n.href} href={n.href} aria-current={path?.startsWith(n.href) ? 'page' : undefined}>{n.label}</Link>)}
+          {NAV.map((n) => <Link key={n.href} href={n.href} aria-current={active(n.href) ? 'page' : undefined}>{n.label}</Link>)}
         </nav>
         <div className="spacer" />
-        <div className="rolebox">
-          <label htmlFor="role">Viewing as</label>
-          <select id="role" value={role} onChange={(e) => setRole(e.target.value as Role)}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select>
-          <input aria-label="Your name" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
-          <span className="muted" title="Role switching only changes the screens and the name recorded in history. It is not authentication or access control.">(demo roles — not sign-in)</span>
-        </div>
+        <span className={`tag ${tone}`} title={last ? `Last read ${fmtTime(last.at)}${last.ok ? '' : ` — failed: ${last.errorMessage}`}` : ''}>{label}</span>
+        <button className="btn small" onClick={refresh} disabled={busy} title="Read the latest copy from the Sheet">{busy ? 'Refreshing…' : 'Refresh'}</button>
       </header>
-      <div className={`connbar ${mode ?? ''}`} role="status" aria-live="polite">
-        <strong>{modeLabel}</strong>
-        {mode === 'google' && <span>· {status?.canWrite ? 'Read & write' : 'Read-only'} · {status?.auth?.account ?? ''}</span>}
-        {last && <span>· Last refresh {fmtTime(last.at)} {last.ok ? '' : <b style={{ color: 'var(--bad)' }}>failed: {last.errorMessage}</b>}</span>}
-        {status?.workbook?.readAt && mode === 'snapshot' && <span>· Captured {fmtTime(status.workbook.readAt)}</span>}
-        {status?.auth?.state && status.auth.state !== 'ready' && mode === 'google' && <span style={{ color: 'var(--bad)' }}>· {status.auth.detail}</span>}
-        <span style={{ flex: 1 }} />
-        <button className="btn small" onClick={refresh} disabled={busy}>{busy ? 'Refreshing…' : 'Refresh from Sheet'}</button>
-        <Link className="btn small" href="/connection">Connection & sync</Link>
-      </div>
+      {mode === 'google' && last && !last.ok && <div className="banner bad">Couldn’t reach the Sheet ({last.errorMessage}). You can keep editing — suggestions are saved on this computer and Sheet updates wait. <Link href="/settings">Settings</Link></div>}
       <main>{children}</main>
     </>
   );

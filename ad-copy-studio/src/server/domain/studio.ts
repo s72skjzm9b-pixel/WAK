@@ -9,6 +9,7 @@ import { UPDATES_FILTER_LAST_ROW } from '../workbook/formulas';
 import { describeError, SheetError, type GatewayMode, type SheetGateway } from '../sheets/gateway';
 import { Repo, newId, now, type Approval, type Revision, type RevisionKind, type RevisionMeta, type FeedbackRow } from '../store/repo';
 import { tx } from '../store/db';
+import { buildCollections } from './collections';
 
 export interface Actor { role: string; name: string }
 const who = (a: Actor) => `${a.name || 'Unnamed'} (${a.role})`;
@@ -67,8 +68,20 @@ export class Studio {
     let last = this.repo.lastGoodRead(mode);
     if (!last) {
       const r = await this.refresh();
-      if (!r.ok) throw new StudioError(503, `Could not read the workbook: ${r.error?.message}`);
-      last = this.repo.lastGoodRead(mode)!;
+      if (r.ok) last = this.repo.lastGoodRead(mode)!;
+      else {
+        // The Sheet can't be reached (e.g. not signed in or offline). Keep working from the last copy
+        // that could be read — the live Sheet's own last read, otherwise the dated snapshot. Writes still
+        // re-read the real Sheet first, so nothing is written on the basis of this fallback.
+        last = this.repo.lastGoodRead('google') ?? this.repo.lastGoodRead('snapshot');
+        if (!last && this.gateways.snapshot) {
+          const id = this.repo.startRead('snapshot');
+          const raw = await this.gateways.snapshot().readWorkbook();
+          this.repo.finishRead(id, true, { raw: JSON.stringify(raw), fingerprint: fp(JSON.stringify(raw.tabs)) });
+          last = this.repo.lastGoodRead('snapshot');
+        }
+        if (!last) throw new StudioError(503, `Could not read the workbook: ${r.error?.message}`);
+      }
     }
     if (this.cache && this.cache.mode === mode && this.cache.readId === last.id) return this.cache.state;
     const raw: RawWorkbook = JSON.parse(last.raw);
@@ -111,6 +124,10 @@ export class Studio {
   validationsFor(text: string, item: CopyItem | null, meta: RevisionMeta): Validation[] {
     const assetType = meta.assetType || item?.assetType || '';
     const formats = item ? item.usages.map((u) => u.format) : [];
+    if (meta.collection && this.cache) {
+      const col = buildCollections(this.cache.state.parsed, this.cache.state.library).find((c) => c.key === meta.collection);
+      for (const g of col?.groups ?? []) formats.push(g.format);
+    }
     for (const t of meta.targets ?? []) if (/_SNO_/.test(t.campaign)) formats.push('search'); else if (/_PMX_/.test(t.campaign)) formats.push('pmax'); else if (/_DG_/.test(t.campaign)) formats.push('demand_gen');
     return validateText(text, assetType, formats);
   }
@@ -171,7 +188,7 @@ export class Studio {
   }
 
   /** Typing/saving: local only. Any edit to approved wording invalidates the approval. */
-  async editRevision(id: string, patch: { proposedText?: string; reason?: string; meta?: RevisionMeta; basedOnRevisionId?: string | null }, actor: Actor): Promise<Revision> {
+  async editRevision(id: string, patch: { proposedText?: string; reason?: string; meta?: RevisionMeta; basedOnRevisionId?: string | null; englishBasis?: string }, actor: Actor): Promise<Revision> {
     const rev = this.mustRevision(id);
     if (rev.state === 'written') throw new StudioError(409, 'This wording has been written to the Sheet. Start a new proposal to change it again.');
     if (rev.state === 'withdrawn' || rev.state === 'superseded') throw new StudioError(409, `This proposal is ${rev.state}.`);
@@ -179,6 +196,9 @@ export class Studio {
     const next: Partial<Revision> = {};
     if (patch.reason !== undefined) next.reason = patch.reason;
     if (patch.meta) next.meta = { ...rev.meta, ...patch.meta };
+    if (patch.englishBasis !== undefined && rev.language !== 'EN' && patch.englishBasis !== rev.englishBasis) {
+      next.englishBasis = patch.englishBasis; next.englishBasisFp = fp(patch.englishBasis);
+    }
     if (textChanged) {
       next.proposedText = patch.proposedText!;
       if (rev.language === 'EN') { next.englishBasis = patch.proposedText!; next.englishBasisFp = fp(patch.proposedText!); }

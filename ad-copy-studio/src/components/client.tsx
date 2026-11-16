@@ -1,22 +1,19 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-export const ROLES = ['Copywriter', 'Approver', 'Reviewer', 'Ads specialist'] as const;
-export type Role = (typeof ROLES)[number];
-
 interface Ctx {
-  role: Role; name: string; setRole: (r: Role) => void; setName: (n: string) => void;
+  name: string; setName: (n: string) => void;
   status: any; reloadStatus: () => Promise<void>; toast: (m: string) => void; version: number; bump: () => void;
 }
 const C = createContext<Ctx | null>(null);
 export const useStudio = () => useContext(C)!;
 
-let current = { role: 'Copywriter' as Role, name: '' };
+const current = { name: '' };
 
 export async function api<T = any>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const res = await fetch(path, {
     method: init?.method ?? (init?.body !== undefined ? 'POST' : 'GET'),
-    headers: { 'Content-Type': 'application/json', 'x-studio-role': current.role, 'x-studio-name': encodeURIComponent(current.name) },
+    headers: { 'Content-Type': 'application/json', 'x-studio-client': '1', 'x-studio-name': encodeURIComponent(current.name) },
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     cache: 'no-store',
   });
@@ -25,28 +22,22 @@ export async function api<T = any>(path: string, init?: { method?: string; body?
   return data as T;
 }
 
-function safeGet(k: string) { try { return localStorage.getItem(k); } catch { return null; } }
-function safeSet(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* private mode */ } }
+export function safeGet(k: string) { try { return localStorage.getItem(k); } catch { return null; } }
+export function safeSet(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* private mode */ } }
 
 export function StudioProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRoleS] = useState<Role>('Copywriter');
   const [name, setNameS] = useState('');
   const [status, setStatus] = useState<any>(null);
   const [toastMsg, setToast] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
-  useEffect(() => {
-    const r = safeGet('studio.role') as Role | null; const n = safeGet('studio.name');
-    if (r && ROLES.includes(r)) { setRoleS(r); current.role = r; }
-    if (n) { setNameS(n); current.name = n; }
-  }, []);
-  const setRole = (r: Role) => { current.role = r; setRoleS(r); safeSet('studio.role', r); };
+  useEffect(() => { const n = safeGet('studio.name'); if (n) { setNameS(n); current.name = n; } }, []);
   const setName = (n: string) => { current.name = n; setNameS(n); safeSet('studio.name', n); };
   const reloadStatus = useCallback(async () => { try { setStatus(await api('/api/status')); } catch (e) { setStatus({ error: (e as Error).message }); } }, []);
   useEffect(() => { reloadStatus(); }, [reloadStatus]);
   const toast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 4200); };
   const bump = () => setVersion((v) => v + 1);
   return (
-    <C.Provider value={{ role, name, setRole, setName, status, reloadStatus, toast, version, bump }}>
+    <C.Provider value={{ name, setName, status, reloadStatus, toast, version, bump }}>
       {children}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
     </C.Provider>

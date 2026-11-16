@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
   // This app lives inside another repository; keep Next.js scoped to this folder.
   turbopack: { root },
   outputFileTracingRoot: root,
+  // Earlier screens were folded into the workspace, Changes and Settings.
+  async redirects() {
+    return [
+      { source: '/write', destination: '/', permanent: false },
+      { source: '/review', destination: '/', permanent: false },
+      { source: '/review/:id', destination: '/changes', permanent: false },
+      { source: '/handover', destination: '/changes', permanent: false },
+      { source: '/connection', destination: '/settings', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

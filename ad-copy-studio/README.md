@@ -64,70 +64,60 @@ folder while using `npm run dev`):
 Back up with `npm run backup` (writes a consistent copy to `~/.la-cabra-ad-copy-studio/backups/<timestamp>/`) or
 `npm run backup -- /path/to/folder`. To restore, stop the app and copy `studio.db` back.
 
-## The three views
+## Using the studio
 
-### Write (copywriter)
-- Browse by customer intent, market (campaign tab membership), language, copy family and asset type. Location alone never
-  decides intent; Christmas and Advent show as gaps because no approved seasonal source exists in the workbook.
-- **Replace wording** proposes new text for one exact line and language. **Add variation** creates an extra line with a new
-  ID and replaces nothing; you choose the groups it is meant for. **Propose retirement** asks for a line to stop being used.
-- Original and proposed wording side by side, word-level diff, character counts against every format the line is used in,
-  translations beside the English, and live illustrative previews with compatible headlines/descriptions from the same group.
-  The editor uses the font of the selected preview placement.
-- Typing autosaves a **local draft only**. The Sheet is never written from this view.
-- Approvers can also **Approve as is** — approve the current Sheet wording exactly as it stands (no Sheet change).
+There are three screens: **Workspace** (where the work happens), **Changes** and **Settings**.
 
-### Review (team)
-- **Copy approvals**: queue of submitted proposals → approval screen.
-- **Combinations**: illustrative Search (desktop/mobile) and Performance Max text previews per campaign group, sampled six at
-  a time with "Show more combinations". Search previews respect a configured **pinning proposal** (none by default; "La Cabra"
-  is not pinned first). PMax offers no pinning. Explicit headline–description pairs are preserved.
-- Feedback per combination: **Works / Needs changes / Comment only**, with reasons (repetition, unclear meaning, wrong context,
-  tone, translation, factual concern…). Feedback is stored with the exact text versions; the app shows when wording has changed
-  since. Combination feedback is separate from copy approval, and marking a preview "Needs changes" does not stop Google from
-  serving it — resolve by changing or removing an asset, or separating incompatible assets into different groups.
+### Workspace
+- **Collections** on the left group copy that is reviewed together: *Online Coffee, Subscriptions, New York Cafés,
+  Danish Cafés, Café visits in brand Search, Brand stories, Not yet assigned, Christmas, Advent calendar*.
+  They are built from the Sheet's existing campaign-tab mappings and are not Google campaigns. Local copy stays local
+  (the New York-only line is never in Danish Cafés), brand stories keep each headline with its own descriptions, and the
+  proposed “La Cabra” headline stays unassigned — it is not added or pinned anywhere automatically.
+- A one-line **summary** shows intent, audience, languages/markets and destination (marked *unconfirmed* where the Sheet says so).
+- **Headlines and descriptions are listed together**, with English, Danish and German side by side. Show or hide
+  languages with the EN / DA / DE buttons. **Click into any wording and type** — it autosaves as a local *suggestion*
+  (“Saving… / Saved / Could not save”). The Sheet is never changed from here. *Original* shows a comparison and a revert.
+- Changing English keeps the translations and marks them **Needs translation review**; nothing is translated or overwritten automatically.
+- **Add headline / Add description** creates new copy in the current collection with its own ID (`NEW-001`…) and
+  empty translation fields. Identical copy that already exists is refused with a short notice.
+- **Ad examples** on the right update as you type. Click a line to see only examples containing it. Choose language,
+  format and desktop/mobile. Examples with suggested wording are labelled. **Works / Needs work / Comment** saves feedback
+  against the exact text shown; if the wording later changes, the old feedback moves to “Earlier feedback on different wording”.
+- **Search** is at the top; **Filter** holds customer intent, status (New, Edited, Needs translation review, Needs work, Returned) and type.
+- On small screens use the **Copy / Preview** switch.
 
-### Handover (Anabelle)
-- Filters by market, language and campaign (eligible group).
-- **Replacements** with exact previous and replacement text and where they are used; **approved new variations**; approved
-  retirements; **approved copy by group**; **unresolved dependencies** (translations needing re-review, missing long headlines,
-  landing URLs to confirm, seasonal gaps, failed or pending writes, combinations marked "needs changes").
-- **Copy to clipboard**, and **Create dated export batch (CSV)**. Each batch records the text fingerprints, approval IDs and the
-  Sheet read it came from. The CSV is a *review/handover CSV* — it has **not** been validated as a Google Ads Editor import.
-- Only wording with a currently valid approval of its exact text is included. Drafts, proposals in review, invalidated approvals
-  and test items are never included; they are counted as excluded.
-- Anabelle does not need to inventory every combination Google serves.
+### Changes
+- **Suggestions**: was → now, the collection and language, and whether translations will need review.
+  **Accept** approves the exact wording and, when connected, writes it to the Sheet and checks it was saved.
+  **Return for editing** (optional note) and **Discard** are also here. Lines that are too long cannot be accepted.
+- **Accepted — waiting for the Sheet**: changes that couldn't be written yet (read-only mode, offline, or a conflict).
+  If the Sheet changed after the suggestion was made, you see both versions and choose *Keep my wording* or *Discard mine*.
+- **For Anabelle: accepted changes**: the old → new list, with **Copy list** and **Download CSV** (a review list, not a
+  Google Ads import file). *Mark as applied* records her confirmation and clears the row from “Updates for Anabelle”
+  in the Sheet; the studio cannot check Google Ads itself.
 
-## Approval and write-back
+### Settings
+Choose **Live Sheet**, **Snapshot** (read-only, dated) or **Practice copy** (local, safe to accept into), sign in to Google,
+and set your name for the history. Technical details (column mapping checks, write log, typography notes) are tucked away there.
+If the live Sheet can't be reached, the workspace keeps working from the last copy it could read and says so at the top.
 
-Four states are kept distinct everywhere: **current Sheet wording → proposed revision → approved revision → written to the Sheet**.
-Nothing is ever labelled "live in Google Ads".
+## How accepting writes to the Sheet
 
-- An approval covers **exact wording** (and, for Danish/German, the English it translates). Any edit invalidates it and returns
-  the proposal to draft. When English changes, open translation proposals are sent back and as-is translation approvals stop counting.
-- **Approve and update Sheet** (approval screen) is the only action that changes canonical wording. Before writing, the app
-  re-reads the Sheet, locates rows by source ID (never by remembered row numbers), and stops with a **conflict** if the wording is no
-  longer what the proposal was based on, if a target cell now holds a formula, or if the change would fall outside the
-  *Updates for Anabelle* FILTER range. The approval screen lists the exact cells, current and new values, and the predicted
-  effect on Updates for Anabelle.
-- For an existing line it writes only:
-  1. the text cell — `Source copy` English column (E) or `Translation review` Danish (D) / German (F) column, and
-  2. that row's `Change reference` **approved replacement (I)** and **approved English (J)** — the workbook's documented exact-text approval.
-  Values are written RAW (never interpreted as formulas); formatting and every other cell are untouched.
-- After writing, it reads the cells back and checks that *Updates for Anabelle* now lists the change. A failed write keeps the approved
-  draft and shows "Sheet write failed"; **retry** is safe: it detects work that already landed, resumes a partial write, and never writes twice.
-- The saved reference (`Change reference` C/E) is **not** advanced on approval, so Anabelle's pending replacement stays visible.
-- After Anabelle applies a change she clicks **I applied this in Google Ads** (an acknowledgement, not verification of Google Ads),
-  and then, as a separate action, **Advance saved reference**, which copies current D/F into C/E for that one row.
-- **New variations are kept local in this release.** The Updates for Anabelle formula filters a fixed range
-  (`'Change reference'!A5:L148`), so an appended row would be invisible to her. To register an approved variation by hand:
-  add it to `Source copy` (next free row inside A5:A100) and `Translation review`, and **insert** its three `Change reference`
-  rows *above the last G-row* (e.g. right-click row 146 → Insert 3 rows above) so the FILTER range expands; copy the formulas from
-  the row above. Then assign it to campaign tabs deliberately.
+- Approval covers the **exact wording** (and, for Danish/German, the English it translates). Any later edit cancels it.
+- Accepting a translation that follows a *suggested* English change is refused until the English is accepted first.
+- For an existing line the studio writes only the text cell (`Source copy` English, or `Translation review` Danish/German)
+  and that row's `Change reference` approval cells (I/J). It re-reads the Sheet first, stops with a conflict if anyone
+  changed the wording, never overwrites formulas, reads the cells back afterwards and confirms “Updates for Anabelle”
+  shows the change. Retrying is safe. The saved reference (C/E) only moves when Anabelle marks a change as applied.
+- **New copy is kept in the studio in this version.** The Updates for Anabelle formula only covers the existing
+  Change reference rows (`A5:L148`), so an appended row would be invisible to her. To register accepted new copy by hand:
+  add it to `Source copy` and `Translation review`, and **insert** its three `Change reference` rows *above the last G-row*
+  (so the formula's range grows), copying the formulas from the row above.
 
 ## What was tested
 
-Automated (`npm test`, 28 tests, run against a sandbox that reproduces the workbook's formulas — including the fixed FILTER bound):
+Automated (`npm test`, 37 tests, run against a sandbox that reproduces the workbook's formulas — including the fixed FILTER bound):
 drafts never write; approval writes only the 3 intended literal cells; Updates for Anabelle detects the change; further edits invalidate
 approval; English edits flag translations and invalidate translation approvals; concurrent Sheet edits produce a conflict and keep the draft;
 failed writes are retryable; retries after a lost response do not write twice; partial writes resume; formula cells are refused; rows outside
@@ -142,6 +132,11 @@ edit dropped the Sheet's own approval; advancing the reference removed the Engli
 restart between the two writes) and was resumed. The test item was then removed: formulas, the FILTER range (`A5:L148`) and
 "No changes since the saved reference" were verified restored.
 
+The simplified workspace (Nov 2026) was also checked in a browser against data created with the earlier version: old drafts,
+a submitted change, a returned translation, an old “variation” with campaign targets and old feedback all reappeared in the right
+collections; editing, translation flags, new copy with empty translations, duplicate refusal, live previews, feedback, accept →
+Sheet → Anabelle's list → mark as applied, restart survival, snapshot mode and an unreachable live Sheet were exercised.
+
 ## Known limitations
 
 - The app's own Google connection (`GoogleSheetsGateway`) has not been run against Google yet, because no credentials were available
@@ -153,7 +148,8 @@ restart between the two writes) and was resumed. The test item was then removed:
 - Previews are illustrative text only: no images, logos, sitelinks or landing URLs (shown as gaps), and not a prediction of what Google serves.
 - The snapshot holds Anabelle's alternative proposals for US_SNO_Branded and DK_PMX_Local only; a live refresh reads all tabs.
 - New variations are not written to the Sheet (see above). Retirement never deletes Sheet rows.
-- Role switching is a convenience for demonstrating the workflow — not authentication or access control.
+- There is no sign-in: anyone using this computer can edit and accept. This is fine for a local prototype only;
+  real accounts and permissions are required before the app is shared or hosted.
 - `values:batchUpdate` atomicity is not relied on: the app verifies by read-back and resumes partial writes.
 
 ## Requirements for later private hosting
@@ -161,8 +157,8 @@ restart between the two writes) and was resumed. The test item was then removed:
 The code keeps Google integration (`src/server/google`, `src/server/sheets`), storage (`src/server/store`) and business rules
 (`src/server/domain`, `src/lib`) separate, so moving to private hosting means:
 
-1. **Authentication**: replace the role switcher with real sign-in (e.g. Google Workspace SSO restricted to the La Cabra domain) and
-   enforce roles server-side in `src/server/http/handler.ts` (the actor is already recorded on every action).
+1. **Authentication and permissions**: add real sign-in (e.g. Google Workspace SSO restricted to the La Cabra domain) and
+   decide who may accept changes; enforce it server-side in `src/server/http/handler.ts` (the actor is already recorded on every action).
 2. **Shared database**: reimplement `src/server/store/repo.ts` on Postgres (the schema in `db.ts` is portable); keep the
    `revision_events` history append-only.
 3. **Google credentials**: use a service account or a per-user OAuth flow with tokens in a secrets manager; register the hosted
@@ -178,8 +174,8 @@ src/server/workbook   header-driven parser, formula replicas (pure)
 src/server/sheets     gateway interface + snapshot and sandbox implementations
 src/server/google     OAuth / service-account auth and the Sheets REST gateway
 src/server/store      SQLite schema and repository (all SQL)
-src/server/domain     studio service, write planner, handover, read models
-src/lib               shared limits, combination generator, preview typography
+src/server/domain     studio service, collections, suggestions, write planner, read models
+src/lib               shared limits, combination generator, workspace helpers, preview typography
 src/app               Next.js pages and API routes
 seed/                 dated snapshot of the real workbook (scripts/build-snapshot.mjs)
 tests/                behaviour tests
