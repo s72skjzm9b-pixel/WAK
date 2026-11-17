@@ -4,7 +4,7 @@ import { accept, returnForEditing, keepAgainstCurrent, markReady, backToDraft } 
 export const dynamic = 'force-dynamic';
 export const POST = route(async (req, ctx) => {
   const { id, action } = await ctx.params;
-  const s = getStudio();
+  const s = (await getStudio());
   const actor = actorFrom(req);
   const b = await body(req).catch(() => ({}));
   switch (action) {

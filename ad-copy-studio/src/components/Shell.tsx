@@ -28,6 +28,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     : mode === 'sandbox' ? 'Practice copy' : mode === 'snapshot' ? 'Snapshot · edits saved locally' : '…';
   const refreshLabel = mode === 'google' ? 'Refresh from Sheet' : mode === 'sandbox' ? 'Reload practice copy' : 'Reload snapshot';
   const tone = mode === 'google' && label === 'Live Sheet' ? 'ok' : mode === 'google' ? 'bad' : mode === 'sandbox' ? 'warn' : 'neutral';
+  if (path === '/login') return <main>{children}</main>;
   const active = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
   return (
     <>
@@ -39,6 +40,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="spacer" />
         <Link href="/settings" className={`tag ${tone} modetag`}>{label}</Link>
         <button className="btn small refresh" onClick={refresh} disabled={busy}>{busy ? 'Reading…' : refreshLabel}</button>
+        {status?.user && <form action="/auth/signout" method="post" className="who"><span title={status.user.email}>{status.user.name}</span><button className="linkbtn" type="submit">Sign out</button></form>}
       </header>
       {mode === 'google' && last && !last.ok && <div className="banner bad">Couldn’t reach the Sheet ({last.errorMessage}). You can keep editing — drafts are saved on this computer and Sheet updates wait. <Link href="/settings">Settings</Link></div>}
       <main>{children}</main>

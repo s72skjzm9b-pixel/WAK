@@ -14,13 +14,13 @@ import { revisionSummary } from './summary';
 
 export async function libraryView(studio: Studio) {
   const wb = await studio.workbook();
-  const revs = studio.repo.listRevisions();
-  const items = wb.library.map((item) => {
+  const revs = (await studio.repo.listRevisions());
+  const items = await Promise.all(wb.library.map(async (item) => {
     const langs = {} as Record<Lang, any>;
     for (const l of ['EN', 'DK', 'DE'] as Lang[]) {
       const v = item.versions[l];
       const mine = revs.filter((r) => r.sourceId === item.sourceId && r.language === l && !['withdrawn', 'superseded'].includes(r.state));
-      const approval = studio.currentWordingApproval(item, l);
+      const approval = (await studio.currentWordingApproval(item, l));
       const englishChanging = l !== 'EN' && revs.some((r) => r.sourceId === item.sourceId && r.language === 'EN' && r.kind === 'replace' && ['submitted', 'approved'].includes(r.state));
       langs[l] = {
         text: v.text, sheetStatus: v.sheetStatus, approvedAsIs: !!approval, approvalId: approval?.id ?? null,
@@ -34,7 +34,7 @@ export async function libraryView(studio: Studio) {
       intent: item.intent, scope: item.scope, destination: item.destination, usageRule: item.usageRule, sheetStatus: item.sheetStatus,
       shortened: item.shortened, note: item.note, usages: item.usages, intents: item.intents, langs,
     };
-  });
+  }));
   const variations = revs.filter((r) => r.kind === 'variation' && !['withdrawn', 'superseded'].includes(r.state)).map(revisionSummary);
   const p = wb.parsed;
   return {
@@ -46,7 +46,7 @@ export async function libraryView(studio: Studio) {
       alternatives: c.alternatives, gaps: c.gaps,
     })),
     campaignMap: p.campaignMap,
-    suggestedNewId: studio.suggestNewId(wb.library),
+    suggestedNewId: (await studio.suggestNewId(wb.library)),
   };
 }
 
@@ -56,7 +56,7 @@ export async function groupContext(studio: Studio, campaign: string, group: stri
   const c = wb.parsed.campaigns.find((x) => x.name === campaign);
   if (!c) return null;
   const byId = new Map(wb.library.map((i) => [i.sourceId, i]));
-  const revs = opts.overlay ? studio.repo.listRevisions({ states: ['submitted', 'approved'] }) : [];
+  const revs = opts.overlay ? (await studio.repo.listRevisions({ states: ['submitted', 'approved'] })) : [];
   const assets: PoolAsset[] = [];
   for (const m of c.memberships.filter((x) => x.group === group)) {
     const item = byId.get(m.sourceId);
@@ -76,7 +76,7 @@ export async function groupContext(studio: Studio, campaign: string, group: stri
   for (const i of wb.library) englishHeadlines[i.sourceId] = i.versions.EN.text;
   const ctx: GroupContext = {
     campaign, group, format: c.format, language: c.language, assets,
-    pins: c.format === 'search' ? (studio.repo.pins(campaign, group) as Record<string, PinPosition>) : {},
+    pins: c.format === 'search' ? ((await studio.repo.pins(campaign, group)) as Record<string, PinPosition>) : {},
   };
   const mapRow = wb.parsed.campaignMap.find((m) => m.name === campaign) ?? null;
   return { ctx, englishHeadlines, gaps: c.gaps.filter((g) => !g.group || true), mapRow };
@@ -85,7 +85,7 @@ export async function groupContext(studio: Studio, campaign: string, group: stri
 export async function statusView(studio: Studio) {
   const mode = studio.mode();
   const gw = studio.gateway();
-  const last = studio.repo.lastRead(mode);
+  const last = (await studio.repo.lastRead(mode));
   let wb: Awaited<ReturnType<Studio['workbook']>> | null = null;
   let wbError: string | null = null;
   try { wb = await studio.workbook(); } catch (e) { wbError = e instanceof Error ? e.message : String(e); }
@@ -101,7 +101,7 @@ export async function statusView(studio: Studio) {
       counts: { sourceIds: wb.parsed.source.length, translations: wb.parsed.translations.length, changeReferenceRows: wb.parsed.changeRef.length, campaignTabs: wb.parsed.campaigns.length, updatesRows: wb.parsed.updatesRows.length },
     } : null,
     workbookError: wbError,
-    attempts: studio.repo.attempts({ limit: 30 }).map((a) => ({ ...a, plan: { cells: a.plan?.cells?.map((c: any) => ({ ref: c.ref, after: c.after, purpose: c.purpose })) ?? [] } })),
+    attempts: (await studio.repo.attempts({ limit: 30 })).map((a) => ({ ...a, plan: { cells: a.plan?.cells?.map((c: any) => ({ ref: c.ref, after: c.after, purpose: c.purpose })) ?? [] } })),
     formats: FORMAT_SPECS,
   };
 }

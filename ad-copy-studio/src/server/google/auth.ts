@@ -29,7 +29,12 @@ export type AuthStatus =
   | { state: 'ready'; detail: string; account?: string };
 
 export function authStatus(): AuthStatus {
-  if (config.googleAuthMode === 'service_account') {
+  if (config.googleAuthMode === 'service_account' || config.serviceAccountJson || config.hosted) {
+    if (config.serviceAccountJson) {
+      try { return { state: 'ready', detail: 'Service account', account: JSON.parse(config.serviceAccountJson).client_email }; }
+      catch { return { state: 'not_configured', detail: 'GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.' }; }
+    }
+    if (config.hosted) return { state: 'not_configured', detail: 'Online, the Sheet is read with a Google service account. Add GOOGLE_SERVICE_ACCOUNT_JSON in the hosting settings.' };
     if (!config.serviceAccountKeyFile) return { state: 'not_configured', detail: 'GOOGLE_SERVICE_ACCOUNT_KEY_FILE is not set.' };
     if (!existsSync(config.serviceAccountKeyFile)) return { state: 'not_configured', detail: 'The service account key file was not found.' };
     try {
@@ -85,8 +90,10 @@ export async function getAccessToken(): Promise<string> {
   if (st.state === 'not_configured') throw new SheetError('not_configured', st.detail);
   if (st.state === 'needs_sign_in') throw new SheetError('auth_required', st.detail);
   try {
-    if (config.googleAuthMode === 'service_account') {
-      const auth = new GoogleAuth({ keyFile: config.serviceAccountKeyFile, scopes: scopes() });
+    if (config.googleAuthMode === 'service_account' || config.serviceAccountJson || config.hosted) {
+      const auth = config.serviceAccountJson
+        ? new GoogleAuth({ credentials: JSON.parse(config.serviceAccountJson), scopes: scopes() })
+        : new GoogleAuth({ keyFile: config.serviceAccountKeyFile, scopes: scopes() });
       const token = await auth.getAccessToken();
       if (!token) throw new Error('No token');
       return token;

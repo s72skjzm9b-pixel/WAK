@@ -5,5 +5,5 @@ export const dynamic = 'force-dynamic';
 export const POST = route(async (req) => {
   const b = await body(req);
   if (!b.sourceId || !b.collection) throw new StudioError(400, 'Choose a line and a collection.');
-  return getStudio().repo.addIntendedUse({ sourceId: b.sourceId, collection: b.collection, field: b.field ?? null, format: b.format ?? null, campaign: null, group: null, createdBy: actorFrom(req).name });
+  return (await (await getStudio()).repo.addIntendedUse({ sourceId: b.sourceId, collection: b.collection, field: b.field ?? null, format: b.format ?? null, campaign: null, group: null, createdBy: actorFrom(req).name }));
 }, { mutating: true });

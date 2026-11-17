@@ -7,6 +7,6 @@ export const POST = route(async (req) => {
   const name = String(b.name ?? '').trim();
   if (!name) throw new StudioError(400, 'Give the collection a name.');
   const key = `local-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'collection'}-${Date.now().toString(36)}`;
-  getStudio().repo.saveCollectionMeta({ key, name, description: b.description ?? '', imageNote: b.imageNote ?? '', formats: b.formats?.length ? b.formats : ['search'], languages: b.languages?.length ? b.languages : ['EN'], details: {}, isLocal: true }, actorFrom(req).name);
+  (await (await getStudio()).repo.saveCollectionMeta({ key, name, description: b.description ?? '', imageNote: b.imageNote ?? '', formats: b.formats?.length ? b.formats : ['search'], languages: b.languages?.length ? b.languages : ['EN'], details: {}, isLocal: true }, actorFrom(req).name));
   return { key };
 }, { mutating: true });

@@ -8,6 +8,6 @@ export const POST = route(async (req) => {
   const name = String(b.name ?? '').trim().slice(0, 40);
   if (!code || !name) throw new StudioError(400, 'Choose a language.');
   if (['EN', 'DK', 'DA', 'DE'].includes(code)) throw new StudioError(400, `${name} is already available.`);
-  getStudio().repo.addLanguage(code, name, b.locale ?? null);
+  (await (await getStudio()).repo.addLanguage(code, name, b.locale ?? null));
   return { code };
 }, { mutating: true });

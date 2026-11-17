@@ -19,7 +19,7 @@ function addTestItem(sb: any) {
 
 describe('live layout with the TEST01 item', () => {
   it('plans exactly Source copy E53 and Change reference I146/J146', async () => {
-    const { sandbox } = makeStudio();
+    const { sandbox } = (await makeStudio());
     addTestItem(sandbox);
     const p = parseWorkbook(await sandbox.readWorkbook());
     const plan = planReplacement(p, { sourceId: 'TEST01', language: 'EN', baseText: 'Studio test line', proposedText: 'Studio test line — revised', englishBasis: 'Studio test line — revised' });
@@ -33,7 +33,7 @@ describe('live layout with the TEST01 item', () => {
   });
 
   it('the test item is never exported even when approved and written', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     addTestItem(sandbox);
     await studio.refresh();
     const r = await studio.createRevision({ kind: 'replace', sourceId: 'TEST01', language: 'EN', proposedText: 'Studio test line — revised' }, writer);

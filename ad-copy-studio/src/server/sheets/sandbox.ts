@@ -15,6 +15,8 @@ export interface SandboxFaults {
   failNextWrites?: { count: number; kind: SheetErrorKind; message?: string; afterApplying?: boolean; partial?: boolean };
 }
 
+export interface BlobStore { load(): Promise<string | null>; save(value: string): Promise<void> }
+
 export class SandboxGateway implements SheetGateway {
   readonly mode = 'sandbox' as const;
   readonly canWrite = true;
@@ -22,18 +24,30 @@ export class SandboxGateway implements SheetGateway {
   writeLog: CellWrite[][] = [];
   private wb: RawWorkbook;
 
-  constructor(seed: RawWorkbook, private file: string | null = null) {
+  private pendingSave: Promise<void> = Promise.resolve();
+  /** `file` = local JSON file (Mac version). `store` = database blob (hosted), reloaded before every operation
+   *  so several server instances never work from different practice copies. */
+  constructor(private seed: RawWorkbook, private file: string | null = null, private store: BlobStore | null = null) {
     if (file && existsSync(file)) this.wb = JSON.parse(readFileSync(file, 'utf8'));
-    else { this.wb = { ...structuredClone(seed), origin: 'sandbox' }; this.recalculate(); this.persist(); }
+    else { this.wb = { ...structuredClone(seed), origin: 'sandbox' }; this.recalculate(); if (!store) this.persist(); }
+  }
+  private async sync() {
+    if (!this.store) return;
+    await this.pendingSave;
+    const json = await this.store.load();
+    if (json) this.wb = JSON.parse(json);
+    else { this.wb = { ...structuredClone(this.seed), origin: 'sandbox' }; this.recalculate(); await this.store.save(JSON.stringify(this.wb)); }
   }
 
   describe() { return 'Local sandbox copy (practice only — not the real Google Sheet)'; }
 
   async readWorkbook(): Promise<RawWorkbook> {
+    await this.sync();
     return { ...structuredClone(this.wb), readAt: new Date().toISOString(), origin: 'sandbox' };
   }
 
   async readCells(refs: string[]): Promise<CellRead[]> {
+    await this.sync();
     return refs.map((ref) => {
       const p = parseA1(ref);
       const value = this.wb.tabs[p.tab]?.values[p.row - 1]?.[p.col] ?? '';
@@ -42,6 +56,7 @@ export class SandboxGateway implements SheetGateway {
   }
 
   async writeCells(writes: CellWrite[]): Promise<void> {
+    await this.sync();
     const f = this.faults.failNextWrites;
     if (f && f.count > 0) {
       f.count -= 1;
@@ -82,6 +97,7 @@ export class SandboxGateway implements SheetGateway {
   }
 
   private persist() {
+    if (this.store) { const json = JSON.stringify(this.wb); this.pendingSave = this.pendingSave.then(() => this.store!.save(json)); return; }
     if (!this.file) return;
     mkdirSync(path.dirname(this.file), { recursive: true });
     const tmp = this.file + '.tmp';

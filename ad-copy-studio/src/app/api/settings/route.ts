@@ -6,7 +6,7 @@ export const POST = route(async (req) => {
   if (b.businessName !== undefined) {
     const n = String(b.businessName).trim();
     if (!n || [...n].length > 25) throw new StudioError(400, 'The business name needs 1–25 characters.');
-    getStudio().repo.setSetting('business_name', n);
+    (await (await getStudio()).repo.setSetting('business_name', n));
   }
   return { ok: true };
 }, { mutating: true });

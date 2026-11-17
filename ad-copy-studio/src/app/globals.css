@@ -359,3 +359,6 @@ fieldset.field legend { font-size: 13px; font-weight: 500; color: var(--ink-2); 
   .langtoggle.desk { display: none; }
   .langselect.phone { display: inline-block; }
 }
+.who { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-2); margin: 0; }
+.login { max-width: 420px; margin: 12vh auto; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: grid; gap: 12px; }
+@media (max-width: 700px) { .who span { display: none; } }

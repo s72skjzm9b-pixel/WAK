@@ -9,7 +9,7 @@ export const GET = route(async (req) => {
   if (u.get('error')) { back.searchParams.set('auth', 'denied'); return NextResponse.redirect(back); }
   try {
     await completeOAuth(u.get('code') ?? '', u.get('state') ?? '');
-    const s = getStudio();
+    const s = (await getStudio());
     s.setMode('google');
     await s.refresh();
     back.searchParams.set('auth', 'ok');

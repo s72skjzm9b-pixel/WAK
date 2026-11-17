@@ -7,6 +7,12 @@ giving Anabelle exactly approved copy with clear replacement instructions.
 - **The studio's local database** keeps proposals, feedback, revision history, approvals, sync records and export batches.
 - Nothing is published to Google Ads, and nothing is hosted: it runs on `http://localhost:3100` on your computer only.
 
+## Online version
+
+The same app can run online with Google sign-in (Supabase for data and sign-in, Vercel for hosting). Setting
+`DATABASE_URL` switches storage to Postgres and requires sign-in; without it the app is the local Mac version.
+Step-by-step instructions: **[DEPLOY.md](DEPLOY.md)**.
+
 ## Start, update and stop
 
 **Easiest:** double-click `Open La Cabra Studio.command` (copy it wherever you like; it expects the studio in
@@ -149,8 +155,8 @@ launcher's stale-build detection.
 - Previews are illustrative text only: no images, logos, sitelinks or landing URLs (shown as gaps), and not a prediction of what Google serves.
 - The snapshot holds Anabelle's alternative proposals for US_SNO_Branded and DK_PMX_Local only; a live refresh reads all tabs.
 - New variations are not written to the Sheet (see above). Retirement never deletes Sheet rows.
-- There is no sign-in: anyone using this computer can edit and accept. This is fine for a local prototype only;
-  real accounts and permissions are required before the app is shared or hosted.
+- Locally there is no sign-in: anyone using this computer can edit. Online, Google sign-in restricted to allowed
+  domains/addresses is required; everyone signed in has the same rights (no separate reviewer/approver roles yet).
 - `values:batchUpdate` atomicity is not relied on: the app verifies by read-back and resumes partial writes.
 
 ## Requirements for later private hosting

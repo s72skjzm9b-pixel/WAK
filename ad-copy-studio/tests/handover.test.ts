@@ -5,7 +5,7 @@ import { generateCombos } from '@/lib/combos';
 
 describe('handover eligibility', () => {
   it('excludes drafts, submitted and invalidated wording; includes only exact approvals', async () => {
-    const { studio } = makeStudio();
+    const { studio } = (await makeStudio());
     const draft = await studio.createRevision({ kind: 'replace', sourceId: 'G01', language: 'EN', proposedText: 'Coffees of the season' }, writer);
     const sub = await studio.createRevision({ kind: 'replace', sourceId: 'G02', language: 'EN', proposedText: 'Rare and bright coffees' }, writer);
     await studio.submit(sub.id, writer);
@@ -25,7 +25,7 @@ describe('handover eligibility', () => {
   });
 
   it('lists written replacements with exact previous and replacement text until the reference is advanced', async () => {
-    const { studio } = makeStudio();
+    const { studio } = (await makeStudio());
     const r = await studio.createRevision({ kind: 'replace', sourceId: 'G03', language: 'EN', proposedText: 'Explore our seasonal coffees' }, writer);
     await studio.submit(r.id, writer);
     await studio.approve(r.id, approver, { updateSheet: true });
@@ -40,14 +40,14 @@ describe('handover eligibility', () => {
   });
 
   it('shows seasonal gaps instead of inventing copy', async () => {
-    const { studio } = makeStudio();
+    const { studio } = (await makeStudio());
     const h = await buildHandover(studio, {});
     expect(h.dependencies.some((d) => d.kind === 'seasonal_gap' && /Christmas/.test(d.campaign ?? ''))).toBe(true);
     expect(h.dependencies.some((d) => d.kind === 'seasonal_gap' && /Advent/.test(d.campaign ?? ''))).toBe(true);
   });
 
   it('never includes test items', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     sandbox.simulateExternalEdit("'Source copy'!A53", 'TEST01');
     sandbox.simulateExternalEdit("'Source copy'!E53", 'Studio test line — do not use');
     sandbox.simulateExternalEdit("'Source copy'!C53", 'Headline');
@@ -61,7 +61,7 @@ describe('handover eligibility', () => {
 
 describe('combination feedback', () => {
   it('stays attached to the exact wording and shows when it changed', async () => {
-    const { studio } = makeStudio();
+    const { studio } = (await makeStudio());
     const combo = { key: 'k1', campaign: 'US_PMX_NCA', group: '1. Coffee', format: 'pmax', language: 'EN' as const, slots: [
       { slot: 'H1', sourceId: 'G03', text: 'Explore our coffees', state: 'sheet' },
       { slot: 'D1', sourceId: 'G05', text: 'Sourced with the changing seasons, roasted to express their origins.', state: 'sheet' },
@@ -74,7 +74,7 @@ describe('combination feedback', () => {
     const fb = (await studio.feedback())[0];
     expect(fb.changedSince).toEqual([{ slot: 'H1', sourceId: 'G03', then: 'Explore our coffees', now: 'Explore our seasonal coffees' }]);
     // Combination feedback is not copy approval.
-    expect(studio.currentWordingApproval((await studio.item('G05'))!, 'EN')).toBeNull();
+    expect((await studio.currentWordingApproval((await studio.item('G05'))!, 'EN'))).toBeNull();
   });
 });
 

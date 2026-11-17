@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 // Autosave. Edits are stored as local DRAFTS; the Sheet is never written here and drafts cannot be approved.
 export const PUT = route(async (req) => {
   const b = await body(req);
-  const s = getStudio();
+  const s = (await getStudio());
   const res = b.isNew
     ? await saveNewCopy(s, { sourceId: b.sourceId || undefined, collection: b.collection, assetType: b.assetType, language: b.language, text: String(b.text ?? ''), linkedHeadlineId: b.linkedHeadlineId ?? null }, actorFrom(req))
     : await saveEdit(s, { sourceId: b.sourceId, language: b.language, text: String(b.text ?? '') }, actorFrom(req));

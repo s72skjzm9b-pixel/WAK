@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   // This app lives inside another repository; keep Next.js scoped to this folder.
   turbopack: { root },
   outputFileTracingRoot: root,
+  // The dated Sheet snapshot is read from disk; make sure it ships with every serverless function online.
+  outputFileTracingIncludes: { '/**': ['./seed/**/*'] },
   // Earlier screens were folded into the workspace, Changes and Settings.
   async redirects() {
     return [

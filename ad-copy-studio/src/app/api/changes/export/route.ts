@@ -4,7 +4,7 @@ import { handoffItems } from '@/lib/handoff';
 export const dynamic = 'force-dynamic';
 // What still needs doing in Google Ads (applied/registered work is excluded). A plain list, NOT a Google Ads import.
 export const GET = route(async (req) => {
-  const v = await workspaceView(getStudio());
+  const v = await workspaceView((await getStudio()));
   const rows = handoffItems(v as any);
   if (req.nextUrl.searchParams.get('format') === 'csv') {
     const esc = (x: string) => { let t = x ?? ''; if (/^[=+\-@]/.test(t)) t = `'${t}`; return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };

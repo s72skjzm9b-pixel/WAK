@@ -16,6 +16,6 @@ export const PATCH = route(async (req, ctx) => {
     if (d.path2 && String(d.path2).length > 15) throw new StudioError(400, 'Display path 2 can have at most 15 characters.');
     patch.details = { finalUrl: d.finalUrl ?? '', path1: d.path1 ?? '', path2: d.path2 ?? '', cta: d.cta ?? '' };
   }
-  getStudio().repo.saveCollectionMeta(patch, actorFrom(req).name);
+  (await (await getStudio()).repo.saveCollectionMeta(patch, actorFrom(req).name));
   return { ok: true };
 }, { mutating: true });

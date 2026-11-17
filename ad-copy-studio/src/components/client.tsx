@@ -44,8 +44,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const bump = () => setVersion((v) => v + 1);
   const [dialog, setDialog] = useState<(DialogSpec & { resolve: (r: { value: string; text: string }) => void }) | null>(null);
   const ask = (spec: DialogSpec) => new Promise<{ value: string; text: string }>((resolve) => setDialog({ ...spec, resolve }));
+  // Online the signed-in Google account is the name; locally we ask once.
+  useEffect(() => { if (status?.user?.name) { current.name = status.user.name; setNameS(status.user.name); } }, [status?.user?.name]);
   const ensureName = async () => {
-    if (current.name.trim()) return true;
+    if (status?.hosted || current.name.trim()) return true;
     const r = await ask({ title: 'What’s your name?', body: 'It is saved with your feedback and reviews so others know who said what. It is not a sign-in.', input: { label: 'Your name', required: true, placeholder: 'e.g. Christian' }, actions: [{ label: 'Cancel', value: 'cancel' }, { label: 'Save', value: 'ok', primary: true }] });
     if (r.value !== 'ok' || !r.text.trim()) return false;
     setName(r.text.trim());

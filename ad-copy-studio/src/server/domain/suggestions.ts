@@ -11,13 +11,13 @@ const OPEN = ['draft', 'submitted', 'changes_requested', 'approved'];
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 export const ADDABLE_FIELDS = ['Headline', 'Long headline', 'Description'] as const;
 
-export function openSuggestion(studio: Studio, sourceId: string, lang: string, kind: 'replace' | 'variation' = 'replace'): Revision | null {
-  return studio.repo.listRevisions({ sourceId, language: lang as Lang }).find((r) => r.kind === kind && OPEN.includes(r.state)) ?? null;
+export async function openSuggestion(studio: Studio, sourceId: string, lang: string, kind: 'replace' | 'variation' = 'replace'): Promise<Revision | null> {
+  return (await studio.repo.listRevisions({ sourceId, language: lang as Lang })).find((r) => r.kind === kind && OPEN.includes(r.state)) ?? null;
 }
 
 /** The English a translation of this line should be checked against: the suggested English if there is one. */
 export async function effectiveEnglish(studio: Studio, sourceId: string): Promise<{ text: string; revisionId: string | null }> {
-  const en = openSuggestion(studio, sourceId, 'EN', 'replace') ?? openSuggestion(studio, sourceId, 'EN', 'variation');
+  const en = (await openSuggestion(studio, sourceId, 'EN', 'replace')) ?? (await openSuggestion(studio, sourceId, 'EN', 'variation'));
   if (en) return { text: en.proposedText, revisionId: en.id };
   const item = await studio.item(sourceId);
   return { text: item?.versions.EN.text ?? '', revisionId: null };
@@ -28,7 +28,7 @@ export async function saveEdit(studio: Studio, input: { sourceId: string; langua
   const item = await studio.item(input.sourceId);
   if (!item) throw new StudioError(404, 'This line is no longer in the Sheet. Refresh to see the current copy.');
   const sheetText = (item.versions as Record<string, { text: string }>)[input.language]?.text ?? '';
-  const open = openSuggestion(studio, input.sourceId, input.language);
+  const open = (await openSuggestion(studio, input.sourceId, input.language));
   if (input.text === sheetText) {
     if (open) await studio.withdraw(open.id, actor);
     return { status: 'reverted' as const, revision: null };
@@ -40,18 +40,18 @@ export async function saveEdit(studio: Studio, input: { sourceId: string; langua
   return { status: 'saved' as const, revision: rev };
 }
 
-function duplicateOf(studio: Studio, lib: Awaited<ReturnType<Studio['workbook']>>['library'], lang: string, text: string, exceptSourceId?: string): string | null {
+async function duplicateOf(studio: Studio, lib: Awaited<ReturnType<Studio['workbook']>>['library'], lang: string, text: string, exceptSourceId?: string): Promise<string | null> {
   const t = norm(text);
   if (!t) return null;
   const sheet = lib.find((i) => i.sourceId !== exceptSourceId && norm((i.versions as Record<string, { text: string }>)[lang]?.text ?? '') === t);
   if (sheet) return sheet.sourceId;
-  const rev = studio.repo.listRevisions({ language: lang as Lang }).find((r) => OPEN.includes(r.state) && r.sourceId !== exceptSourceId && norm(r.proposedText) === t);
+  const rev = (await studio.repo.listRevisions({ language: lang as Lang })).find((r) => OPEN.includes(r.state) && r.sourceId !== exceptSourceId && norm(r.proposedText) === t);
   return rev ? rev.sourceId : null;
 }
 
-export function newCopyId(studio: Studio): string {
+export async function newCopyId(studio: Studio): Promise<string> {
   let max = 0;
-  for (const r of studio.repo.listRevisions()) { const m = /^NEW-(\d+)$/.exec(r.sourceId); if (m) max = Math.max(max, Number(m[1])); }
+  for (const r of (await studio.repo.listRevisions())) { const m = /^NEW-(\d+)$/.exec(r.sourceId); if (m) max = Math.max(max, Number(m[1])); }
   return `NEW-${String(max + 1).padStart(3, '0')}`;
 }
 
@@ -62,27 +62,27 @@ export async function saveNewCopy(studio: Studio, input: { sourceId?: string; co
   if (input.language === 'EN' || !input.sourceId) {
     if (input.language !== 'EN') throw new StudioError(400, 'Write the English first; translations belong to it.');
     if (!input.sourceId && !(ADDABLE_FIELDS as readonly string[]).includes(input.assetType)) throw new StudioError(400, `“${input.assetType}” is not a Google Ads text field. Use Headline, Long headline or Description.`);
-    const existing = input.sourceId ? openSuggestion(studio, input.sourceId, 'EN', 'variation') : null;
+    const existing = input.sourceId ? (await openSuggestion(studio, input.sourceId, 'EN', 'variation')) : null;
     if (!input.text.trim()) {
       if (existing) {
         await studio.withdraw(existing.id, actor);
-        for (const r of studio.repo.listRevisions({ sourceId: existing.sourceId }).filter((x) => x.kind === 'variation' && x.language !== 'EN' && OPEN.includes(x.state))) await studio.withdraw(r.id, actor);
+        for (const r of (await studio.repo.listRevisions({ sourceId: existing.sourceId })).filter((x) => x.kind === 'variation' && x.language !== 'EN' && OPEN.includes(x.state))) await studio.withdraw(r.id, actor);
       }
       return { status: 'removed' as const, revision: null };
     }
-    const dup = duplicateOf(studio, wb.library, 'EN', input.text, input.sourceId);
+    const dup = await duplicateOf(studio, wb.library, 'EN', input.text, input.sourceId);
     if (dup) throw new StudioError(409, `This wording already exists, so it was not added again.`);
     if (existing) return { status: 'saved' as const, revision: await studio.editRevision(existing.id, { proposedText: input.text }, actor) };
-    const rev = await studio.createRevision({ kind: 'variation', sourceId: input.sourceId || newCopyId(studio), language: 'EN', proposedText: input.text,
+    const rev = await studio.createRevision({ kind: 'variation', sourceId: input.sourceId || (await newCopyId(studio)), language: 'EN', proposedText: input.text,
       meta: { assetType: input.assetType, collection: input.collection, linkedHeadlineId: input.linkedHeadlineId ?? null, separatedFrom: input.separatedFrom ?? null } }, actor);
     return { status: 'saved' as const, revision: rev };
   }
   // Translation of a new line: linked to that line's English, never to another line's translations.
-  const enVar = openSuggestion(studio, input.sourceId, 'EN', 'variation') ?? studio.repo.listRevisions({ sourceId: input.sourceId, language: 'EN' }).find((r) => r.kind === 'variation' && r.state === 'written') ?? null;
+  const enVar = (await openSuggestion(studio, input.sourceId, 'EN', 'variation')) ?? (await studio.repo.listRevisions({ sourceId: input.sourceId, language: 'EN' })).find((r) => r.kind === 'variation' && r.state === 'written') ?? null;
   if (!enVar) throw new StudioError(400, 'Write the English first; translations belong to it.');
-  const existing = openSuggestion(studio, input.sourceId, input.language, 'variation');
+  const existing = (await openSuggestion(studio, input.sourceId, input.language, 'variation'));
   if (!input.text.trim()) { if (existing) await studio.withdraw(existing.id, actor); return { status: 'removed' as const, revision: null }; }
-  const dup = duplicateOf(studio, wb.library, input.language, input.text, input.sourceId);
+  const dup = await duplicateOf(studio, wb.library, input.language, input.text, input.sourceId);
   if (dup) throw new StudioError(409, `This wording already exists, so it was not added again.`);
   if (existing) return { status: 'saved' as const, revision: await studio.editRevision(existing.id, { proposedText: input.text, englishBasis: enVar.proposedText }, actor) };
   const rev = await studio.createRevision({ kind: 'variation', sourceId: input.sourceId, language: input.language as Lang, proposedText: input.text, meta: { assetType: enVar.meta.assetType, collection: enVar.meta.collection, linkedHeadlineId: enVar.meta.linkedHeadlineId ?? null } }, actor);
@@ -91,7 +91,7 @@ export async function saveNewCopy(studio: Studio, input: { sourceId?: string; co
 
 /** Deliberate step: the draft is finished and may be reviewed. */
 export async function markReady(studio: Studio, id: string, actor: Actor) {
-  const rev = studio.mustRevision(id);
+  const rev = (await studio.mustRevision(id));
   if (rev.state === 'submitted') return rev;
   if (!['draft', 'changes_requested'].includes(rev.state)) throw new StudioError(409, 'Only drafts can be marked ready for review.');
   if (rev.kind !== 'retire' && !rev.proposedText.trim()) throw new StudioError(400, 'The wording is empty.');
@@ -100,11 +100,11 @@ export async function markReady(studio: Studio, id: string, actor: Actor) {
 
 /** Back to draft without losing anything (e.g. “not finished after all”). */
 export async function backToDraft(studio: Studio, id: string, actor: Actor) {
-  const rev = studio.mustRevision(id);
+  const rev = (await studio.mustRevision(id));
   if (rev.state !== 'submitted') throw new StudioError(409, 'Only items that are ready for review can go back to draft.');
-  studio.repo.updateRevision(id, { state: 'draft', readyAt: null });
-  studio.repo.addEvent(id, actor.name || 'Local user', 'back_to_draft', 'submitted', 'draft');
-  return studio.mustRevision(id);
+  (await studio.repo.updateRevision(id, { state: 'draft', readyAt: null }));
+  (await studio.repo.addEvent(id, actor.name || 'Local user', 'back_to_draft', 'submitted', 'draft'));
+  return (await studio.mustRevision(id));
 }
 
 export type ApproveOutcome = 'approved_locally' | 'accepted_practice' | 'written' | 'live_writes_off';
@@ -123,7 +123,7 @@ export function approveMeaning(studio: Studio, rev?: Pick<Revision, 'kind' | 'la
 
 /** Approve a Ready-for-review item. Drafts can never be approved directly. */
 export async function accept(studio: Studio, id: string, actor: Actor) {
-  const rev = studio.mustRevision(id);
+  const rev = (await studio.mustRevision(id));
   if (rev.state === 'written') return { ok: true, message: 'Already in the Sheet.', revision: rev };
   if (rev.state === 'approved') {
     if (rev.kind !== 'replace' || !CANONICAL_LANGS.includes(rev.language)) return { ok: true, message: 'Already approved.', revision: rev };
@@ -131,7 +131,7 @@ export async function accept(studio: Studio, id: string, actor: Actor) {
   }
   if (rev.state !== 'submitted') throw new StudioError(409, 'This is still a draft. Mark it “Ready for review” first.');
   const item = await studio.item(rev.sourceId);
-  studio.assertEnglishReady(rev, item);
+  (await studio.assertEnglishReady(rev, item));
   const res = await studio.approve(id, actor, { updateSheet: studio.gateway().canWrite });
   const meaning = approveMeaning(studio, rev);
   if (res.ok && res.revision.state === 'approved' && rev.kind === 'replace' && CANONICAL_LANGS.includes(rev.language)) {
@@ -141,14 +141,14 @@ export async function accept(studio: Studio, id: string, actor: Actor) {
 }
 
 export async function returnForEditing(studio: Studio, id: string, comment: string, actor: Actor) {
-  const rev = studio.mustRevision(id);
+  const rev = (await studio.mustRevision(id));
   if (rev.state === 'draft') await studio.submit(id, actor);
   return studio.requestChanges(id, comment, actor);
 }
 
 /** Conflict: the Sheet changed after the suggestion was made. Keep the suggestion, now against the current Sheet wording. */
 export async function keepAgainstCurrent(studio: Studio, id: string, actor: Actor) {
-  const rev = studio.mustRevision(id);
+  const rev = (await studio.mustRevision(id));
   if (rev.kind !== 'replace') throw new StudioError(400, 'Only edits of existing lines can conflict with the Sheet.');
   if (rev.state === 'written') throw new StudioError(409, 'Already written.');
   const r = await studio.refresh();
@@ -156,11 +156,11 @@ export async function keepAgainstCurrent(studio: Studio, id: string, actor: Acto
   const item = await studio.item(rev.sourceId);
   if (!item) throw new StudioError(404, 'Line not found in the Sheet.');
   const now = (item.versions as Record<string, { text: string }>)[rev.language]?.text ?? '';
-  studio.repo.revokeApprovals({ revisionId: id }, 'Rebased onto newer Sheet wording');
-  studio.repo.updateRevision(id, { baseText: now, baseFp: fp(now), state: 'draft', syncState: 'none', syncDetail: '', readyAt: null });
-  studio.repo.addEvent(id, actor.name || 'Local user', 'kept_against_current_sheet', rev.state, 'draft', { previousBase: rev.baseText, newBase: now });
+  (await studio.repo.revokeApprovals({ revisionId: id }, 'Rebased onto newer Sheet wording'));
+  (await studio.repo.updateRevision(id, { baseText: now, baseFp: fp(now), state: 'draft', syncState: 'none', syncDetail: '', readyAt: null }));
+  (await studio.repo.addEvent(id, actor.name || 'Local user', 'kept_against_current_sheet', rev.state, 'draft', { previousBase: rev.baseText, newBase: now }));
   if (now === rev.proposedText) await studio.withdraw(id, actor);
-  return studio.mustRevision(id);
+  return (await studio.mustRevision(id));
 }
 
 /** “Make a separate version here”: a new line with its own identity in this collection, starting from the
@@ -170,9 +170,9 @@ export async function separateVersion(studio: Studio, input: { sourceId: string;
   if (!item) throw new StudioError(404, 'Line not found.');
   const text = input.text ?? item.versions.EN.text;
   const field = (ADDABLE_FIELDS as readonly string[]).includes(item.assetType) ? item.assetType : 'Headline';
-  const rev = await studio.createRevision({ kind: 'variation', sourceId: newCopyId(studio), language: 'EN', proposedText: text,
+  const rev = await studio.createRevision({ kind: 'variation', sourceId: (await newCopyId(studio)), language: 'EN', proposedText: text,
     meta: { assetType: field, collection: input.collection, separatedFrom: input.sourceId, linkedHeadlineId: item.linkedHeadlineId } }, actor);
-  studio.repo.addIntendedUse({ sourceId: rev.sourceId, collection: input.collection, field, format: null, campaign: null, group: null, createdBy: actor.name || 'Local user' });
+  (await studio.repo.addIntendedUse({ sourceId: rev.sourceId, collection: input.collection, field, format: null, campaign: null, group: null, createdBy: actor.name || 'Local user' }));
   return rev;
 }
 
@@ -182,11 +182,11 @@ export async function useIdea(studio: Studio, input: { sourceId: string; collect
   const item = await studio.item(input.sourceId);
   if (!item) throw new StudioError(404, 'Idea not found.');
   if (input.mode === 'link') {
-    studio.repo.addIntendedUse({ sourceId: input.sourceId, collection: input.collection, field: input.field, format: input.format ?? null, campaign: null, group: null, createdBy: actor.name || 'Local user' });
+    (await studio.repo.addIntendedUse({ sourceId: input.sourceId, collection: input.collection, field: input.field, format: input.format ?? null, campaign: null, group: null, createdBy: actor.name || 'Local user' }));
     return { linked: true, sourceId: input.sourceId };
   }
-  const rev = await studio.createRevision({ kind: 'variation', sourceId: newCopyId(studio), language: 'EN', proposedText: item.versions.EN.text,
+  const rev = await studio.createRevision({ kind: 'variation', sourceId: (await newCopyId(studio)), language: 'EN', proposedText: item.versions.EN.text,
     meta: { assetType: input.field, collection: input.collection, separatedFrom: input.sourceId } }, actor);
-  if (input.format) studio.repo.addIntendedUse({ sourceId: rev.sourceId, collection: input.collection, field: input.field, format: input.format, campaign: null, group: null, createdBy: actor.name || 'Local user' });
+  if (input.format) (await studio.repo.addIntendedUse({ sourceId: rev.sourceId, collection: input.collection, field: input.field, format: input.format, campaign: null, group: null, createdBy: actor.name || 'Local user' }));
   return { linked: false, sourceId: rev.sourceId };
 }

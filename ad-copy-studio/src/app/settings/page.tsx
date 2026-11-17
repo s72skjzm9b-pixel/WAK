@@ -56,7 +56,16 @@ function Settings() {
             <ol className="checklist">
               {live.steps.map((st: any) => <li key={st.key} className={st.done ? 'done' : ''}><span aria-hidden>{st.done ? '✓' : '○'}</span> {st.label}{st.detail && !st.done ? <div className="small muted">{st.detail}</div> : st.detail ? <span className="small muted"> · {st.detail}</span> : null}</li>)}
             </ol>
-            {!live.steps[0].done && (
+            {!live.steps[0].done && live.hosted && (
+              <details className="small"><summary>How to connect the Sheet to the online studio (about 10 minutes, once)</summary>
+                <ol>
+                  <li>In console.cloud.google.com, turn on the “Google Sheets API” and create a service account (no roles needed). Create a JSON key for it.</li>
+                  <li>In the hosting settings (Vercel → Project → Settings → Environment Variables), add <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> with the full contents of that key, then redeploy.</li>
+                  <li>Share the workbook with the service account’s email address as <b>Viewer</b>. Never make the Sheet public.</li>
+                </ol>
+              </details>
+            )}
+            {!live.steps[0].done && !live.hosted && (
               <details className="small"><summary>How to set up the Google connection (about 10 minutes, once)</summary>
                 <ol>
                   <li>Open console.cloud.google.com and create a project (or use an existing one). Turn on the “Google Sheets API”.</li>
@@ -79,8 +88,9 @@ function Settings() {
 
       <section>
         <h2>You</h2>
+        {s.hosted ? <p className="small">Signed in as <b>{s.user?.name}</b> ({s.user?.email}). Your name is saved with your edits, feedback and reviews.</p> : <>
         <label className="field" style={{ maxWidth: 320 }}><span>Your name</span><input type="text" value={name} placeholder="e.g. Christian" onChange={(e) => setName(e.target.value)} /></label>
-        <p className="small muted">Saved with your feedback and reviews. There is no sign-in: anyone using this computer can edit. Real accounts and permissions are needed before sharing the studio.</p>
+        <p className="small muted">Saved with your feedback and reviews. There is no sign-in on this computer: anyone using it can edit.</p></>}
         <button className="linkbtn" onClick={() => { safeSet('ws.introDismissed', '0'); toast('The short introduction will show again in the workspace.'); }}>Show the introduction again</button>
       </section>
 
@@ -101,7 +111,7 @@ function Settings() {
 
       <details className="tech">
         <summary>Technical details</summary>
-        <p className="small">Workbook ID <code>{s.spreadsheetId}</code> · local data in <code>{s.dataDir}</code> (back up with <code>npm run backup</code>).</p>
+        <p className="small">Workbook ID <code>{s.spreadsheetId}</code> · {s.hosted ? 'data stored in Supabase (backed up by Supabase)' : <>local data in <code>{s.dataDir}</code> (back up with <code>npm run backup</code>)</>}.</p>
         {wb && <>
           <p className="small">{wb.counts.sourceIds} source IDs · {wb.counts.campaignTabs} campaign tabs · {wb.counts.updatesRows} rows in “Updates for Anabelle”.</p>
           {wb.limitations?.length > 0 && <ul className="small">{wb.limitations.map((l: string, i: number) => <li key={i}>{l}</li>)}</ul>}

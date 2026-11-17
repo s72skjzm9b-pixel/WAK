@@ -1,7 +1,10 @@
 import { mkdtempSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openDb } from '@/server/store/db';
+import crypto from 'node:crypto';
+import { openSqliteSql } from '@/server/store/db';
+import { openPostgres } from '@/server/store/pg';
+import type { Sql } from '@/server/store/sql';
 import { Repo } from '@/server/store/repo';
 import { Studio, type Actor } from '@/server/domain/studio';
 import { SandboxGateway } from '@/server/sheets/sandbox';
@@ -16,12 +19,22 @@ export function tmpDir() { return mkdtempSync(path.join(os.tmpdir(), 'studio-tes
 
 export function seed(): RawWorkbook { return loadSnapshotFile(path.join(__dirname, '..', 'seed', 'workbook-snapshot.json')); }
 
-export function makeStudio(opts: { dir?: string; sandbox?: SandboxGateway } = {}) {
+/** Set STUDIO_TEST_PG=postgres://… to run the same tests on PostgreSQL (one schema per test folder). */
+export const PG_URL = process.env.STUDIO_TEST_PG || '';
+export const onPostgres = !!PG_URL;
+
+export async function openTestSql(dir: string): Promise<Sql> {
+  if (!PG_URL) return openSqliteSql(path.join(dir, 'studio.db'));
+  const schema = 't_' + crypto.createHash('sha1').update(dir).digest('hex').slice(0, 12);
+  return openPostgres(PG_URL, schema, { max: 2 });
+}
+
+export async function makeStudio(opts: { dir?: string; sandbox?: SandboxGateway } = {}) {
   const dir = opts.dir ?? tmpDir();
-  const repo = new Repo(openDb(path.join(dir, 'studio.db')));
+  const repo = new Repo(await openTestSql(dir));
   const sandbox = opts.sandbox ?? new SandboxGateway(seed(), path.join(dir, 'sandbox.json'));
   const snapshot = new SnapshotGateway(seed());
-  const studio = new Studio(repo, { sandbox: () => sandbox, snapshot: () => snapshot }, 'sandbox');
+  const studio = await new Studio(repo, { sandbox: () => sandbox, snapshot: () => snapshot }, 'sandbox').init();
   return { studio, repo, sandbox, dir };
 }
 

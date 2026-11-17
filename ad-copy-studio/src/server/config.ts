@@ -22,6 +22,17 @@ export const config = {
   /** Real writes to the live Sheet stay OFF until a fresh live read, conflict check and an explicitly authorised,
    *  labelled test have been done. Set STUDIO_LIVE_WRITES=enabled only after that test (see README). */
   liveWritesEnabled: env.STUDIO_LIVE_WRITES === 'enabled',
+  // ---- Hosted (online) version. Setting DATABASE_URL switches storage to Postgres (Supabase) and turns on sign-in.
+  databaseUrl: env.DATABASE_URL || '',
+  dbSchema: env.STUDIO_DB_SCHEMA || 'ad_studio',
+  get hosted() { return !!(env.DATABASE_URL); },
+  supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL || '',
+  supabaseAnonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  /** Who may sign in online: Google accounts on these domains, plus these named addresses. */
+  allowedEmailDomains: (env.STUDIO_ALLOWED_EMAIL_DOMAINS || '').split(',').map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean),
+  allowedEmails: (env.STUDIO_ALLOWED_EMAILS || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
+  /** Service-account key as JSON text (hosted alternative to a key file). */
+  serviceAccountJson: env.GOOGLE_SERVICE_ACCOUNT_JSON || '',
   /** Source IDs starting with this prefix are test items: never exported, never in campaign previews. */
   testIdPrefix: 'TEST',
 };

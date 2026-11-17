@@ -3,6 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { sqliteDriver } from './sql';
 
 type Migration = string | { sql: string; data?: (d: DatabaseSync) => void };
 
@@ -162,6 +163,8 @@ const MIGRATIONS: Migration[] = [
       void now;
     },
   },
+  // v3: key/value storage used by the hosted version (kept identical locally).
+  `CREATE TABLE IF NOT EXISTS blobs (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);`,
 ];
 
 let db: DatabaseSync | null = null;
@@ -200,7 +203,13 @@ export function getDb(file: string): DatabaseSync {
   return db;
 }
 
+/** @deprecated synchronous helper kept for the import script */
 export function tx<T>(d: DatabaseSync, fn: () => T): T {
   d.exec('BEGIN IMMEDIATE');
   try { const r = fn(); d.exec('COMMIT'); return r; } catch (e) { d.exec('ROLLBACK'); throw e; }
+}
+
+/** The local (Mac) storage: SQLite file with migrations, behind the async driver. */
+export function openSqliteSql(file: string) {
+  return sqliteDriver(openDb(file));
 }

@@ -12,7 +12,7 @@ async function submittedReplacement(studio: any, sourceId = 'G03', lang: 'EN' | 
 
 describe('drafts never touch the Sheet', () => {
   it('typing and saving a draft performs no writes', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const before = await sandbox.readWorkbook();
     const r = await studio.createRevision({ kind: 'replace', sourceId: 'G03', language: 'EN', proposedText: 'Explore our coff' }, writer);
     await studio.editRevision(r.id, { proposedText: 'Explore our coffees today' }, writer);
@@ -25,7 +25,7 @@ describe('drafts never touch the Sheet', () => {
 
 describe('approve and update Sheet', () => {
   it('changes only the intended literal cells and the comparison picks it up', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const before = await sandbox.readWorkbook();
     const r = await submittedReplacement(studio);
     const res = await studio.approve(r.id, approver, { updateSheet: true });
@@ -46,7 +46,7 @@ describe('approve and update Sheet', () => {
   });
 
   it('English changes flag translations for re-review', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const dk = await submittedReplacement(studio, 'G03', 'DK', 'Opdag vores kaffer');
     await studio.approveAsIs('G03', 'DE', approver);
     const en = await submittedReplacement(studio);
@@ -57,43 +57,43 @@ describe('approve and update Sheet', () => {
     expect(p.updatesRows.some((x) => x.sourceId === 'G03' && x.lang === 'DE')).toBe(true);
     expect(p.translations.find((t) => t.sourceId === 'G03')!.dkStatus).toMatch(/English changed/);
     // The open Danish proposal was sent back, and the German as-is approval no longer counts.
-    expect(studio.mustRevision(dk.id).state).toBe('changes_requested');
+    expect((await studio.mustRevision(dk.id)).state).toBe('changes_requested');
     const item = (await studio.item('G03'))!;
-    expect(studio.currentWordingApproval(item, 'DE')).toBeNull();
+    expect((await studio.currentWordingApproval(item, 'DE'))).toBeNull();
   });
 
   it('a translation approval covers the English it translates', async () => {
-    const { studio } = makeStudio();
+    const { studio } = (await makeStudio());
     const dk = await submittedReplacement(studio, 'G05', 'DK', 'Indkøbt efter sæsonen, ristet for at fremhæve oprindelsen.');
     await studio.approve(dk.id, approver, { updateSheet: false });
-    expect(studio.checkRevisionApproval(studio.mustRevision(dk.id), await studio.item('G05')).valid).toBe(true);
+    expect((await studio.checkRevisionApproval(await studio.mustRevision(dk.id), await studio.item('G05'))).valid).toBe(true);
     const en = await submittedReplacement(studio, 'G05', 'EN', 'Sourced with the seasons, roasted to express their origins.');
     await studio.approve(en.id, approver, { updateSheet: true });
-    expect(studio.mustRevision(dk.id).state).toBe('changes_requested');
-    expect(studio.checkRevisionApproval(studio.mustRevision(dk.id), await studio.item('G05')).valid).toBe(false);
+    expect((await studio.mustRevision(dk.id)).state).toBe('changes_requested');
+    expect((await studio.checkRevisionApproval(await studio.mustRevision(dk.id), await studio.item('G05'))).valid).toBe(false);
   });
 });
 
 describe('approval is for exact wording', () => {
   it('further edits invalidate the approval and return the proposal to draft', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const r = await submittedReplacement(studio);
     await studio.approve(r.id, approver, { updateSheet: false });
-    expect(studio.checkRevisionApproval(studio.mustRevision(r.id), null).valid).toBe(true);
+    expect((await studio.checkRevisionApproval(await studio.mustRevision(r.id), null)).valid).toBe(true);
     await studio.editRevision(r.id, { proposedText: 'Explore our seasonal coffee' }, writer);
-    const after = studio.mustRevision(r.id);
+    const after = (await studio.mustRevision(r.id));
     expect(after.state).toBe('draft');
-    const chk = studio.checkRevisionApproval(after, null);
+    const chk = (await studio.checkRevisionApproval(after, null));
     expect(chk.valid).toBe(false);
     await expect(studio.writeToSheet(r.id, approver)).rejects.toThrow(/Approve/);
     expect(sandbox.writeLog).toHaveLength(0);
-    expect(studio.repo.events(r.id).some((e: any) => e.action === 'approval_invalidated')).toBe(true);
+    expect((await studio.repo.events(r.id)).some((e: any) => e.action === 'approval_invalidated')).toBe(true);
   });
 });
 
 describe('conflicts, failures and retries', () => {
   it('a concurrent Sheet edit produces a conflict instead of an overwrite', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const r = await submittedReplacement(studio);
     sandbox.simulateExternalEdit("'Source copy'!E7", 'Explore the coffees');
     const res = await studio.approve(r.id, approver, { updateSheet: true });
@@ -106,7 +106,7 @@ describe('conflicts, failures and retries', () => {
   });
 
   it('a failed write keeps the approved draft and can be retried', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const r = await submittedReplacement(studio);
     sandbox.faults.failNextWrites = { count: 1, kind: 'permission', message: 'No edit access' };
     const res = await studio.approve(r.id, approver, { updateSheet: true });
@@ -120,7 +120,7 @@ describe('conflicts, failures and retries', () => {
   });
 
   it('retrying after a lost response does not write twice', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const r = await submittedReplacement(studio);
     sandbox.faults.failNextWrites = { count: 1, kind: 'network', afterApplying: true };
     const first = await studio.approve(r.id, approver, { updateSheet: true });
@@ -136,7 +136,7 @@ describe('conflicts, failures and retries', () => {
   });
 
   it('resumes a partial write (text landed, approval cells did not) instead of reporting a conflict', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const r = await submittedReplacement(studio);
     sandbox.faults.failNextWrites = { count: 1, kind: 'network', partial: true };
     const first = await studio.approve(r.id, approver, { updateSheet: true });
@@ -150,7 +150,7 @@ describe('conflicts, failures and retries', () => {
   });
 
   it('a proposal that never wrote still treats an outside edit to its own wording as a conflict', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const r = await submittedReplacement(studio);
     sandbox.simulateExternalEdit("'Source copy'!E7", 'Explore our seasonal coffees'); // someone typed the same text by hand
     const res = await studio.approve(r.id, approver, { updateSheet: true });
@@ -160,7 +160,7 @@ describe('conflicts, failures and retries', () => {
   });
 
   it('refuses to write when the Change reference row falls outside the Updates FILTER range', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     sandbox.insertRows('Change reference', 5, 3); // pushes G48 rows beyond row 148
     await studio.refresh();
     const r = await submittedReplacement(studio, 'G48', 'EN', 'La Cabra Coffee');
@@ -171,7 +171,7 @@ describe('conflicts, failures and retries', () => {
   });
 
   it('never plans to write formula columns', async () => {
-    const { sandbox } = makeStudio();
+    const { sandbox } = (await makeStudio());
     const p = parseWorkbook(await sandbox.readWorkbook());
     const plan = planReplacement(p, { sourceId: 'G05', language: 'DK', baseText: p.translations[4].dk, proposedText: 'Ny tekst', englishBasis: p.source[4].english });
     const refs = plan.cells.map((c) => c.ref);
@@ -184,7 +184,7 @@ describe('conflicts, failures and retries', () => {
 
 describe('application acknowledgement is separate from approval', () => {
   it('approval leaves the pending update; acknowledgement + explicit advance clears it', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     const r = await submittedReplacement(studio);
     await studio.approve(r.id, approver, { updateSheet: true });
     let p = parseWorkbook(await sandbox.readWorkbook());
@@ -208,14 +208,14 @@ describe('application acknowledgement is separate from approval', () => {
 
 describe('persistence', () => {
   it('proposals, approvals and the sandbox survive a restart', async () => {
-    const first = makeStudio();
+    const first = (await makeStudio());
     const r = await submittedReplacement(first.studio);
     await first.studio.approve(r.id, approver, { updateSheet: true });
-    first.repo.db.close();
-    const second = makeStudio({ dir: first.dir });
-    const again = second.studio.mustRevision(r.id);
+    await first.repo.sql.close();
+    const second = (await makeStudio({ dir: first.dir }));
+    const again = (await second.studio.mustRevision(r.id));
     expect(again.state).toBe('written');
-    expect(second.repo.events(r.id).length).toBeGreaterThan(2);
+    expect((await second.repo.events(r.id)).length).toBeGreaterThan(2);
     const [cell] = await second.sandbox.readCells(["'Source copy'!E7"]);
     expect(cell.value).toBe('Explore our seasonal coffees');
   });
@@ -223,7 +223,7 @@ describe('persistence', () => {
 
 describe('new variations', () => {
   it('stay local, never replace the existing line and require a new ID', async () => {
-    const { studio, sandbox } = makeStudio();
+    const { studio, sandbox } = (await makeStudio());
     await expect(studio.createRevision({ kind: 'variation', sourceId: 'G03', language: 'EN', proposedText: 'x' }, writer)).rejects.toThrow(/already exists/);
     const v = await studio.createRevision({ kind: 'variation', language: 'EN', proposedText: 'Seasonal coffees, roasted in Copenhagen', meta: { assetType: 'Headline', targets: [{ campaign: 'US_PMX_NCA', group: '1. Coffee' }] } }, writer);
     expect(v.sourceId).toBe('G49');

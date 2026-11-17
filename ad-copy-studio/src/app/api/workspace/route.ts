@@ -3,6 +3,6 @@ import { workspaceView } from '@/server/domain/workspace';
 import { authStatus } from '@/server/google/auth';
 export const dynamic = 'force-dynamic';
 export const GET = route(async () => {
-  const v = await workspaceView(getStudio());
+  const v = await workspaceView((await getStudio()));
   return { ...v, connection: { ...v.connection, authState: authStatus().state } };
 });

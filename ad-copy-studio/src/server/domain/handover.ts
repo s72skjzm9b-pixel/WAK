@@ -35,8 +35,8 @@ export interface Handover {
 export async function buildHandover(studio: Studio, f: HandoverFilters = {}): Promise<Handover> {
   const wb = await studio.workbook();
   const lib = new Map(wb.library.map((i) => [i.sourceId, i]));
-  const revs = studio.repo.listRevisions();
-  const acks = studio.repo.listAcks();
+  const revs = (await studio.repo.listRevisions());
+  const acks = (await studio.repo.listAcks());
   const marketOk = (m: string) => !f.market || m === f.market;
   const langOk = (l: Lang) => !f.language || l === f.language;
   const campOk = (c: string) => !f.campaign || c === f.campaign;
@@ -52,7 +52,7 @@ export async function buildHandover(studio: Studio, f: HandoverFilters = {}): Pr
       if (!marketOk(u.market) || !langOk(u.language) || !campOk(u.campaign)) continue;
       const v = item.versions[u.language];
       if (!v.text) { dependencies.push({ kind: 'missing_translation', sourceId: item.sourceId, language: u.language, campaign: u.campaign, group: u.group, detail: `${u.language} wording missing for ${item.sourceId}.` }); continue; }
-      const a = studio.currentWordingApproval(item, u.language);
+      const a = (await studio.currentWordingApproval(item, u.language));
       if (!a) { notApproved++; continue; }
       const written = revs.find((r) => r.kind === 'replace' && r.state === 'written' && r.sourceId === item.sourceId && r.language === u.language && r.proposedText === v.text);
       approved.push({
@@ -70,7 +70,7 @@ export async function buildHandover(studio: Studio, f: HandoverFilters = {}): Pr
     if (!langOk(r.language)) continue;
     const usages = (item?.usages ?? []).filter((u) => u.language === r.language && marketOk(u.market) && campOk(u.campaign));
     if ((f.market || f.campaign) && !usages.length) continue;
-    const chk = studio.checkRevisionApproval(r, item ?? null);
+    const chk = (await studio.checkRevisionApproval(r, item ?? null));
     if (!chk.valid) {
       dependencies.push({ kind: 'approval_invalid', sourceId: r.sourceId, language: r.language, detail: `Written replacement no longer approved: ${chk.reason}.` });
       continue;
@@ -95,7 +95,7 @@ export async function buildHandover(studio: Studio, f: HandoverFilters = {}): Pr
     if (!langOk(r.language)) continue;
     const targets = (r.meta.targets ?? []).filter((t) => campOk(t.campaign) && marketOk(t.campaign.split('_')[0]));
     if ((f.market || f.campaign) && !targets.length) continue;
-    const chk = studio.checkRevisionApproval(r, null);
+    const chk = (await studio.checkRevisionApproval(r, null));
     if (!chk.valid) { dependencies.push({ kind: 'approval_invalid', sourceId: r.sourceId, language: r.language, detail: `New variation approval invalid: ${chk.reason}.` }); continue; }
     variations.push({ revisionId: r.id, proposedId: r.sourceId, language: r.language, text: r.proposedText, englishBasis: r.englishBasis, assetType: r.meta.assetType ?? '', targets, approvalId: chk.approval.id, approvedAt: chk.approval.approvedAt, textFp: fp(r.proposedText) });
     if (!targets.length) dependencies.push({ kind: 'variation_unassigned', sourceId: r.sourceId, language: r.language, detail: `${r.sourceId} is approved but has no intended campaign group. It is not distributed automatically.` });
